@@ -141,6 +141,8 @@ class Hero:
         self.shield = 0.0
         self.max_shield = hp
         self.defense = defense
+        self.crit_chance = 0.0
+        self.crit_damage = 1.5
         self.energy = 0.0
         self.is_alive = True
         self.team = None                     # will be set to 0 or 1
@@ -162,6 +164,9 @@ class Hero:
         """Simple final stat (expand with % bonuses later)."""
         return self.atk * (1 + sum(b.value for b in self.buffs if b.name == "atk_buff"))
 
+    def compute_final_speed(self) -> int:
+        return self.speed + int(sum(b.value for b in self.buffs if b.name == "speed_buff"))
+
     def is_cc_blocked(self) -> bool:
         return not self.flags["passives_enabled"]   # can expand with more CC
 
@@ -180,6 +185,17 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
         if target is None or not target.is_alive:
             continue
         dmg = caster.compute_final_atk() * effect.params.get("mult", 1.0)
+        
+        is_crit = False
+        if random.random() < getattr(caster, 'crit_chance', 0.0):
+            dmg *= getattr(caster, 'crit_damage', 1.5)
+            is_crit = True
+            
+        hp_threshold_pct = effect.params.get("hp_threshold_pct")
+        if hp_threshold_pct is not None and target.hp / target.max_hp < hp_threshold_pct / 100.0:
+            dmg *= effect.params.get("hp_threshold_mult", 1.0)
+            print(f"    Target HP below {hp_threshold_pct}%, additional damage applied!")
+
         # Apply all damage modifiers in priority order
         for mod in sorted(caster.modifiers["damage"] + target.modifiers["damage"], key=lambda m: m.priority):
             dmg = mod.func(dmg, target, caster) or dmg
@@ -196,10 +212,12 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
             print(f"    {_hero_tag(target)}'s shield resonance reduced damage by {shield_reduction*100:.0f}%.")
 
         if context.get("damage_source") == "basic":
-            print(f"  {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, dealing {dmg:.0f} damage.")
+            crit_str = " (CRITICAL HIT!)" if is_crit else ""
+            print(f"  {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, dealing {dmg:.0f} damage.{crit_str}")
         else:
-            print(f"    {_hero_tag(caster)}'s effect hit {_hero_tag(target)}, dealing {dmg:.0f} damage.")
-        apply_damage(target, dmg, context.get("is_crit", False))
+            crit_str = " (CRITICAL HIT!)" if is_crit else ""
+            print(f"    {_hero_tag(caster)}'s effect hit {_hero_tag(target)}, dealing {dmg:.0f} damage.{crit_str}")
+        apply_damage(target, dmg, is_crit)
         
         if shield_steal_pct > 0:
             total_shield_gained += dmg * shield_steal_pct
@@ -284,6 +302,14 @@ def _handle_modify_stat(effect: Effect, caster: Hero, targets: List[Hero], conte
             target.max_hp *= mult
             target.hp = min(target.hp, target.max_hp)
             print(f"    {_hero_tag(target)}'s max HP increased to {target.max_hp:.0f}.")
+        elif hasattr(target, stat_type):
+            val = getattr(target, stat_type)
+            if "mult" in effect.params:
+                val *= effect.params.get("mult", 1.0)
+            if "add" in effect.params:
+                val += effect.params.get("add", 0.0)
+            setattr(target, stat_type, val)
+            print(f"    {_hero_tag(target)}'s {stat_type} changed to {val}.")
 
 def _handle_apply_cc_immunity(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     heal_mult = effect.params.get("heal_mult", 2.0)
@@ -331,6 +357,33 @@ def _handle_apply_shield_resonance(effect: Effect, caster: Hero, targets: List[H
         target.flags["has_shield_cc_resist_pct"] = effect.params.get("cc_resist_pct", 10)
         print(f"    {_hero_tag(target)} now has shield resonance active.")
 
+def _handle_galatea_barrage(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    base_mult = effect.params.get("mult", 0.5)
+    for target in targets:
+        if not target.is_alive:
+            continue
+            
+        print(f"    [Galatea] unleashes a Barrage against {_hero_tag(target)}!")
+        # 4 initial hits
+        for _ in range(4):
+            if not target.is_alive:
+                break
+            eff = Effect("damage", mult=base_mult)
+            _handle_damage(eff, caster, [target], {"damage_source": "skill"})
+            
+        if target.is_alive and (target.hp / getattr(target, 'max_hp', 1)) < 0.3:
+            print(f"    {_hero_tag(target)} HP below 30%! Barrage continues!")
+            for _ in range(2):
+                if not target.is_alive:
+                    break
+                eff = Effect("damage", mult=base_mult)
+                _handle_damage(eff, caster, [target], {"damage_source": "skill"})
+                
+            speed_bonus = effect.params.get("speed_bonus", 300)
+            duration = effect.params.get("duration", 2)
+            caster.buffs.append(Buff("speed_buff", speed_bonus, duration))
+            print(f"    {_hero_tag(caster)} gains {speed_bonus} Speed for {duration} rounds!")
+
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
 register_effect_handler("override_basic", _handle_override_basic)
@@ -339,6 +392,7 @@ register_effect_handler("modify_stat", _handle_modify_stat)
 register_effect_handler("apply_cc_immunity", _handle_apply_cc_immunity)
 register_effect_handler("angela_dispel", _handle_angela_dispel)
 register_effect_handler("apply_shield_resonance", _handle_apply_shield_resonance)
+register_effect_handler("galatea_barrage", _handle_galatea_barrage)
 
 
 # ====================== CORE COMBAT FUNCTIONS ======================
@@ -464,6 +518,9 @@ def get_targets_for_effect(effect: Effect, caster: Hero, context: Dict = None) -
     if effect.params.get("target_1_random_enemy"):
         enemies = get_enemies(caster)
         return random.sample(enemies, min(1, len(enemies))) if enemies else []
+    if effect.params.get("target_lowest_hp"):
+        enemies = get_enemies(caster)
+        return [min(enemies, key=lambda h: h.hp / getattr(h, "max_hp", getattr(h, "hp", 1)))] if enemies else []
     if effect.params.get("target_2_random_enemies"):
         enemies = get_enemies(caster)
         return random.sample(enemies, min(2, len(enemies))) if enemies else []
@@ -540,7 +597,7 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
         print(f"Turn {global_round + 1}")
         # render_battle_ui(team1, team2, global_round)
         # Sort by speed descending, ties broken by team slot order
-        acting_order = sorted(all_heroes, key=lambda h: (-h.speed, all_heroes.index(h)))
+        acting_order = sorted(all_heroes, key=lambda h: (-h.compute_final_speed(), all_heroes.index(h)))
         
         for hero in acting_order:
             if not hero.is_alive:

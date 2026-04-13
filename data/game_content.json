@@ -86,6 +86,18 @@
           "shield_steal_pct": 0.5
         }
       ]
+    },
+    "galatea_dance": {
+      "name": "Death Barrage",
+      "effects": [
+        {
+          "type": "galatea_barrage",
+          "mult": 0.8,
+          "speed_bonus": 500,
+          "duration": 2,
+          "target_lowest_hp": true
+        }
+      ]
     }
   },
   "passives": {
@@ -179,6 +191,18 @@
           "type": "apply_shield_resonance",
           "dr_pct": 5,
           "cc_resist_pct": 10
+        }
+      ]
+    },
+    "galatea_assassin": {
+      "name": "Assassin Instincts",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "crit_chance",
+          "add": 0.3,
+          "target_self": true
         }
       ]
     }
@@ -307,15 +331,26 @@
         "argus_slash",
         "shield_resonance"
       ]
+    },
+    "galatea": {
+      "name": "Galatea",
+      "speed": 1050,
+      "atk": 50000,
+      "hp": 150000,
+      "defense": 4000,
+      "active_skill": "galatea_dance",
+      "passives": [
+        "galatea_assassin"
+      ]
     }
   },
   "teams": {
     "team1_default": [
+      "galatea",
       "argus",
       "angela",
       "fredrin",
-      "tara",
-      "dps"
+      "tara"
     ],
     "team2_default": [
       "enemy1",
