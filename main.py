@@ -66,18 +66,18 @@ def _log_effect(caster: "Hero", effect: "Effect", targets: List["Hero"]):
     target_text = _fmt_target_list(targets)
     if effect.type == "damage":
         mult = effect.params.get("mult", 1.0)
-        print(f"      The damage effect ({mult:.2f}x) from {_hero_tag(caster)} is resolved against {target_text}.")
+        print(f"  The damage effect ({mult:.2f}x) from {_hero_tag(caster)} is resolved against {target_text}.")
     elif effect.type == "apply_cc":
         cc_type = effect.params.get("cc_type", "unknown")
         duration = effect.params.get("duration", 1)
-        print(f"      {_hero_tag(caster)} attempts to inflict {cc_type} on {target_text} for {duration} turn(s).")
+        print(f"  {_hero_tag(caster)} attempts to inflict {cc_type} on {target_text} for {duration} turn(s).")
     elif effect.type == "modify_heal":
-        print(f"      {_hero_tag(caster)} altered healing behavior for this battle.")
+        print(f"  {_hero_tag(caster)} altered healing behavior for this battle.")
     elif effect.type == "override_basic":
-        print(f"      {_hero_tag(caster)} changed the next basic attack behavior.")
+        print(f"  {_hero_tag(caster)} changed the next basic attack behavior.")
     # We can omit printing generic event types so we don't spam unformatted params
     elif effect.type not in ["apply_cc_immunity", "angela_dispel", "apply_shield_resonance"]: 
-        print(f"      {_hero_tag(caster)} triggered {effect.type} on {target_text}.")
+        print(f"  {_hero_tag(caster)} triggered {effect.type} on {target_text}.")
 
 # ====================== EVENT SYSTEM ======================
 class EventSystem:
@@ -187,24 +187,18 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
         if "taunt" in target.cc_states and target.cc_states["taunt"]["taunter"] == caster.name:
             reduction = target.cc_states["taunt"]["damage_reduction_pct"] / 100.0
             dmg *= (1 - reduction)
-            print(f"      Taunt reduced damage by {reduction*100:.0f}%.")
+            print(f"    Taunt reduced damage by {reduction*100:.0f}%.")
             
         # Target shield passive damage reduction
         if target.shield > 0 and target.flags.get("has_shield_dr_pct"):
             shield_reduction = target.flags["has_shield_dr_pct"] / 100.0
             dmg *= (1 - shield_reduction)
-            print(f"      {_hero_tag(target)}'s shield resonance reduced damage by {shield_reduction*100:.0f}%.")
+            print(f"    {_hero_tag(target)}'s shield resonance reduced damage by {shield_reduction*100:.0f}%.")
 
         if context.get("damage_source") == "basic":
-            print(
-                f"      {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, "
-                f"dealing {dmg:.0f} damage."
-            )
+            print(f"  {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, dealing {dmg:.0f} damage.")
         else:
-            print(
-                f"      {_hero_tag(caster)}'s effect hit {_hero_tag(target)}, "
-                f"dealing {dmg:.0f} damage."
-            )
+            print(f"    {_hero_tag(caster)}'s effect hit {_hero_tag(target)}, dealing {dmg:.0f} damage.")
         apply_damage(target, dmg, context.get("is_crit", False))
         
         if shield_steal_pct > 0:
@@ -224,7 +218,7 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
         if target.shield > 0 and target.flags.get("has_shield_cc_resist_pct"):
             resist_chance = target.flags["has_shield_cc_resist_pct"] / 100.0
             if random.random() < resist_chance:
-                print(f"      {_hero_tag(target)}'s shield resonated and resisted {cc_title}!")
+                print(f"    {_hero_tag(target)}'s shield resonated and resisted {cc_title}!")
                 continue
 
         # Check for CC immunity shield
@@ -232,7 +226,7 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
         if immune_buffs:
             b = immune_buffs[0]
             target.buffs.remove(b)
-            print(f"      {_hero_tag(target)} blocked {cc_title} with CC Immunity shield!")
+            print(f"    {_hero_tag(target)} blocked {cc_title} with CC Immunity shield!")
             heal_src = getattr(b, "source_hero", target)
             apply_heal(target, b.value, heal_src)
             continue
@@ -246,13 +240,11 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
             }
         else:
             target.cc_states[cc_type] = max(target.cc_states.get(cc_type, -1), until_round)
-        print(
-            f"      {cc_title} effect was applied to {_hero_tag(target)}, lasts for {duration} turn(s)."
-        )
+        print(f"    {cc_title} effect was applied to {_hero_tag(target)}, lasts for {duration} turn(s).")
         if cc_type == "seal_of_light":
             target.flags["passives_enabled"] = False
             target.flags["sealed_until"] = until_round
-            print(f"      {_hero_tag(target)}'s passives are sealed until turn {until_round + 1}.")
+            print(f"    {_hero_tag(target)}'s passives are sealed until turn {until_round + 1}.")
             # Reset specific stacks (example)
             if "power_of_light" in target.stacks:
                 target.stacks["power_of_light"] = 0
@@ -274,14 +266,14 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
 
 def _handle_override_basic(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     caster.basic_attack_override = effect   # store for execute_basic_attack
-    print(f"      {_hero_tag(caster)} prepared a basic-attack override.")
+    print(f"    {_hero_tag(caster)} prepared a basic-attack override.")
 
 def _handle_modify_heal(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     # Example: turn heal into damage
     def inverter(amt: float, t: Hero, s: Hero) -> float:
         return -amt
     caster.modifiers["heal"].append(Modifier("heal_inverter", inverter, priority=100))
-    print(f"      Healing inversion is now active around {_hero_tag(caster)}.")
+    print(f"    Healing inversion is now active around {_hero_tag(caster)}.")
 
 
 def _handle_modify_stat(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
@@ -291,7 +283,7 @@ def _handle_modify_stat(effect: Effect, caster: Hero, targets: List[Hero], conte
             mult = effect.params.get("mult", 1.0)
             target.max_hp *= mult
             target.hp = min(target.hp, target.max_hp)
-            print(f"      {_hero_tag(target)}'s max HP increased to {target.max_hp:.0f}.")
+            print(f"    {_hero_tag(target)}'s max HP increased to {target.max_hp:.0f}.")
 
 def _handle_apply_cc_immunity(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     heal_mult = effect.params.get("heal_mult", 2.0)
@@ -303,7 +295,7 @@ def _handle_apply_cc_immunity(effect: Effect, caster: Hero, targets: List[Hero],
         # Hack to attach heal source to buff
         b.source_hero = caster
         target.buffs.append(b)
-        print(f"      {_hero_tag(caster)} granted CC Immunity to {_hero_tag(target)} for {duration} turn(s).")
+        print(f"    {_hero_tag(caster)} granted CC Immunity to {_hero_tag(target)} for {duration} turn(s).")
 
 def _handle_angela_dispel(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     triggered_round = context.get("current_round", global_round)
@@ -320,7 +312,7 @@ def _handle_angela_dispel(effect: Effect, caster: Hero, targets: List[Hero], con
         if cc_type and cc_type in target.cc_states:
             del target.cc_states[cc_type]
             cc_title = cc_type.replace("_", " ").title()
-            print(f"      {_hero_tag(caster)}'s passive dispelled {cc_title} from {_hero_tag(target)}!")
+            print(f"    {_hero_tag(caster)}'s passive dispelled {cc_title} from {_hero_tag(target)}!")
             
             # trigger heal
             heal_mult = effect.params.get("heal_mult", 1.0)
@@ -337,7 +329,7 @@ def _handle_apply_shield_resonance(effect: Effect, caster: Hero, targets: List[H
     for target in targets:
         target.flags["has_shield_dr_pct"] = effect.params.get("dr_pct", 5)
         target.flags["has_shield_cc_resist_pct"] = effect.params.get("cc_resist_pct", 10)
-        print(f"      {_hero_tag(target)} now has shield resonance active.")
+        print(f"    {_hero_tag(target)} now has shield resonance active.")
 
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
@@ -355,7 +347,7 @@ def apply_shield(target: Hero, amount: float):
         return
     old_shield = target.shield
     target.shield = min(target.max_shield, target.shield + amount)
-    print(f"      {_hero_tag(target)} gained {target.shield - old_shield:.0f} shield! (Current: {target.shield:.0f}/{target.max_shield:.0f})")
+    print(f"    {_hero_tag(target)} gained {target.shield - old_shield:.0f} shield! (Current: {target.shield:.0f}/{target.max_shield:.0f})")
 
 def apply_damage(target: Hero, amount: float, is_crit: bool = False):
     if not target.is_alive:
@@ -366,15 +358,15 @@ def apply_damage(target: Hero, amount: float, is_crit: bool = False):
         absorbed = min(target.shield, amount)
         target.shield -= absorbed
         amount -= absorbed
-        print(f"        {_hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
+        print(f"    {_hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
         
     if amount > 0:
         target.hp -= amount
-        print(f"        {_hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
+        print(f"    {_hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
         if target.hp <= 0:
             target.is_alive = False
             target.event_system.emit("on_death", target=target)
-            print(f"        {_hero_tag(target)} has been defeated.")
+            print(f"    {_hero_tag(target)} has been defeated.")
 
     # Idle Heroes energy gain on being hit
     gain = 20 if is_crit else 10
@@ -384,16 +376,11 @@ def apply_heal(target: Hero, amount: float, source: Hero):
     for mod in sorted(target.modifiers["heal"] + source.modifiers["heal"], key=lambda m: m.priority):
         amount = mod.func(amount, target, source) or amount
     if amount < 0:                     # healing inverted to damage
-        print(
-            f"      {_hero_tag(source)}'s heal was inverted and dealt {-amount:.0f} damage to {_hero_tag(target)}."
-        )
+        print(f"    {_hero_tag(source)}'s heal was inverted and dealt {-amount:.0f} damage to {_hero_tag(target)}.")
         apply_damage(target, -amount)
     else:
         target.hp = min(target.max_hp, target.hp + amount)
-        print(
-            f"      {_hero_tag(source)} healed {_hero_tag(target)} for {amount:.0f}; "
-            f"{_hero_tag(target)} now has {target.hp:.0f} HP."
-        )
+        print(f"    {_hero_tag(source)} healed {_hero_tag(target)} for {amount:.0f}; {_hero_tag(target)} now has {target.hp:.0f} HP.")
 
 def execute_basic_attack(caster: Hero):
     if caster.basic_attack_override:
@@ -425,7 +412,7 @@ def execute_basic_attack(caster: Hero):
 def execute_skill(caster: Hero, skill: Skill, overcharge_bonus: float = 0.0):
     _log_action(caster, "SKILL", get_enemies(caster), detail=f"{skill.name}")
     if overcharge_bonus > 0:
-        print(f"      Overcharge bonus active: {overcharge_bonus*100:.0f}%.")
+        print(f"    Overcharge bonus active: {overcharge_bonus*100:.0f}%.")
     for effect in skill.effects:
         context = {
             "current_round": global_round,
