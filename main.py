@@ -165,7 +165,9 @@ class Hero:
         return self.atk * (1 + sum(b.value for b in self.buffs if b.name == "atk_buff"))
 
     def compute_final_speed(self) -> int:
-        return self.speed + int(sum(b.value for b in self.buffs if b.name == "speed_buff"))
+        speed_from_buffs = int(sum(b.value for b in self.buffs if b.name == "speed_buff"))
+        speed_penalty = int(self.flags.get("abyssal_speed_penalty", 0))
+        return max(1, self.speed + speed_from_buffs - speed_penalty)
 
     def is_cc_blocked(self) -> bool:
         return not self.flags["passives_enabled"]   # can expand with more CC
@@ -204,6 +206,14 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
             reduction = target.cc_states["taunt"]["damage_reduction_pct"] / 100.0
             dmg *= (1 - reduction)
             print(f"    Taunt reduced damage by {reduction*100:.0f}%.")
+
+        damage_reduction = sum(b.value for b in target.buffs if b.name == "damage_reduction")
+        if damage_reduction > 0:
+            dmg *= max(0.0, 1.0 - damage_reduction)
+
+        damage_taken_up = sum(b.value for b in target.buffs if b.name == "damage_taken_up")
+        if damage_taken_up > 0:
+            dmg *= (1.0 + damage_taken_up)
             
         # Target shield passive damage reduction
         if target.shield > 0 and target.flags.get("has_shield_dr_pct"):
@@ -384,6 +394,162 @@ def _handle_galatea_barrage(effect: Effect, caster: Hero, targets: List[Hero], c
             caster.buffs.append(Buff("speed_buff", speed_bonus, duration))
             print(f"    {_hero_tag(caster)} gains {speed_bonus} Speed for {duration} rounds!")
 
+
+def _pick_top_atk_enemies(caster: Hero, count: int) -> List[Hero]:
+    enemies = get_enemies(caster)
+    return sorted(enemies, key=lambda h: h.atk, reverse=True)[:count]
+
+
+def _pick_random_from_top_atk(caster: Hero, count: int = 3) -> Hero | None:
+    top = _pick_top_atk_enemies(caster, count)
+    if not top:
+        return None
+    return random.choice(top)
+
+
+def _clear_abyssal_mark(selena: Hero):
+    state = selena.flags.get("abyssal_eyes")
+    if not state:
+        return
+    target = state.get("target")
+    if target is not None:
+        target.flags.pop("has_abyssal_eyes", None)
+        target.flags.pop("abyssal_speed_penalty", None)
+    selena.flags.pop("abyssal_eyes", None)
+
+
+def _set_abyssal_mark(selena: Hero, target: Hero, countdown: int, speed_reduction: int):
+    old_state = selena.flags.get("abyssal_eyes")
+    if old_state and old_state.get("target") is not None and old_state.get("target") != target:
+        old_target = old_state["target"]
+        old_target.flags.pop("has_abyssal_eyes", None)
+        old_target.flags.pop("abyssal_speed_penalty", None)
+
+    target.flags["has_abyssal_eyes"] = True
+    target.flags["abyssal_speed_penalty"] = speed_reduction
+    selena.flags["abyssal_eyes"] = {
+        "target": target,
+        "countdown": countdown,
+        "pending_retarget": False,
+        "speed_reduction": speed_reduction,
+        "initial_countdown": countdown,
+    }
+    print(f"    {_hero_tag(target)} is marked by Abyssal Eyes (countdown: {countdown}).")
+
+
+def _trigger_abyssal_punishment(selena: Hero):
+    state = selena.flags.get("abyssal_eyes")
+    if not state:
+        return
+
+    target = state.get("target")
+    if target is None or not target.is_alive:
+        state["pending_retarget"] = True
+        return
+
+    stun_rounds = int(selena.flags.get("abyssal_stun_rounds", 4))
+    damage_taken_up_pct = float(selena.flags.get("abyssal_damage_taken_up_pct", 0.15))
+    damage_taken_up_rounds = int(selena.flags.get("abyssal_damage_taken_up_rounds", 3))
+    heal_pct = float(selena.flags.get("abyssal_heal_pct_max_hp", 0.5))
+
+    target.cc_states["stun"] = max(target.cc_states.get("stun", -1), global_round + stun_rounds)
+    target.buffs.append(Buff("damage_taken_up", damage_taken_up_pct, damage_taken_up_rounds, is_debuff=True))
+    print(f"    Abyssal Punishment hits {_hero_tag(target)}: stun {stun_rounds} rounds, +{damage_taken_up_pct*100:.0f}% damage taken for {damage_taken_up_rounds} rounds.")
+
+    heal_amount = selena.max_hp * heal_pct
+    apply_heal(selena, heal_amount, selena)
+
+    state["countdown"] = int(state.get("initial_countdown", 6))
+    print(f"    Abyssal Eyes countdown reset to {state['countdown']} on {_hero_tag(target)}.")
+
+
+def _reduce_cc_immunity(target: Hero, rounds: int):
+    for buff in target.buffs[:]:
+        if buff.name != "cc_immunity":
+            continue
+        buff.duration -= rounds
+        if buff.duration <= 0:
+            target.buffs.remove(buff)
+            print(f"    {_hero_tag(target)} lost CC Immunity due to reduction.")
+
+
+def _execute_selena_basic(caster: Hero):
+    state = caster.flags.get("abyssal_eyes")
+    if not state:
+        fallback = _pick_random_from_top_atk(caster)
+        if fallback:
+            _set_abyssal_mark(caster, fallback, int(caster.flags.get("abyssal_initial_countdown", 6)), int(caster.flags.get("abyssal_speed_reduction", 200)))
+            state = caster.flags.get("abyssal_eyes")
+
+    marked_target = state.get("target") if state else None
+    if marked_target is None or not marked_target.is_alive:
+        marked_target = pick_target(caster)
+
+    enemies = [e for e in get_enemies(caster) if e != marked_target]
+    other_target = random.choice(enemies) if enemies else None
+
+    targets = [t for t in [marked_target, other_target] if t is not None and t.is_alive]
+    _log_action(caster, "BASIC", targets)
+    _handle_damage(Effect("damage", mult=1.0), caster, targets, {"damage_source": "basic"})
+
+    for target in targets:
+        _reduce_cc_immunity(target, 2)
+
+    if state and marked_target is not None and marked_target.is_alive and state.get("target") == marked_target:
+        state["countdown"] -= 1
+        print(f"    Abyssal Eyes countdown on {_hero_tag(marked_target)} reduced by 1 (now {state['countdown']}).")
+
+    caster.buffs.append(Buff("damage_reduction", 0.05, 1))
+    print(f"    {_hero_tag(caster)} gains 5% damage reduction for 1 round.")
+
+
+def _handle_apply_abyssal_eyes(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    target = _pick_random_from_top_atk(caster, int(effect.params.get("top_n_atk", 3)))
+    if target is None:
+        return
+
+    caster.flags["selena_kit_enabled"] = True
+    caster.flags["abyssal_initial_countdown"] = int(effect.params.get("initial_countdown", 6))
+    caster.flags["abyssal_speed_reduction"] = int(effect.params.get("speed_reduction", 200))
+    caster.flags["abyssal_end_round_energy_burn"] = int(effect.params.get("end_round_energy_burn", 10))
+    caster.flags["abyssal_stun_rounds"] = int(effect.params.get("punishment_stun_rounds", 4))
+    caster.flags["abyssal_damage_taken_up_pct"] = float(effect.params.get("punishment_damage_taken_up_pct", 0.15))
+    caster.flags["abyssal_damage_taken_up_rounds"] = int(effect.params.get("punishment_damage_taken_up_rounds", 3))
+    caster.flags["abyssal_heal_pct_max_hp"] = float(effect.params.get("punishment_heal_pct_max_hp", 0.5))
+    _set_abyssal_mark(caster, target, caster.flags["abyssal_initial_countdown"], caster.flags["abyssal_speed_reduction"])
+
+
+def _handle_selena_abyssal_bloom(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    state = caster.flags.get("abyssal_eyes")
+    if not state:
+        return
+
+    marked = state.get("target")
+    if marked is None or not marked.is_alive:
+        state["pending_retarget"] = True
+        return
+
+    enemies = [e for e in get_enemies(caster) if e.is_alive and e != marked]
+    extra_targets = sorted(enemies, key=lambda h: h.atk, reverse=True)[:2]
+    hit_targets = [marked] + extra_targets
+    _log_action(caster, "SKILL", hit_targets, detail="Abyssal Bloom")
+
+    skill_mult = effect.params.get("mult", 1.2)
+    for target in hit_targets:
+        _handle_damage(Effect("damage", mult=skill_mult), caster, [target], {"damage_source": "skill"})
+        if random.random() < effect.params.get("stun_chance", 0.3):
+            stun_effect = Effect("apply_cc", cc_type="stun", duration=effect.params.get("stun_duration", 2))
+            _handle_apply_cc(stun_effect, caster, [target], {"current_round": global_round})
+
+    state["countdown"] -= int(effect.params.get("countdown_reduce", 2))
+    print(f"    Abyssal Eyes countdown on {_hero_tag(marked)} reduced by 2 (now {state['countdown']}).")
+
+    if state["countdown"] <= int(effect.params.get("instant_trigger_threshold", 2)):
+        _trigger_abyssal_punishment(caster)
+
+    caster.energy = min(999, caster.energy + int(effect.params.get("self_energy_gain", 20)))
+    print(f"    {_hero_tag(caster)} gains +20 energy from Abyssal Bloom.")
+
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
 register_effect_handler("override_basic", _handle_override_basic)
@@ -393,6 +559,8 @@ register_effect_handler("apply_cc_immunity", _handle_apply_cc_immunity)
 register_effect_handler("angela_dispel", _handle_angela_dispel)
 register_effect_handler("apply_shield_resonance", _handle_apply_shield_resonance)
 register_effect_handler("galatea_barrage", _handle_galatea_barrage)
+register_effect_handler("apply_abyssal_eyes", _handle_apply_abyssal_eyes)
+register_effect_handler("selena_abyssal_bloom", _handle_selena_abyssal_bloom)
 
 
 # ====================== CORE COMBAT FUNCTIONS ======================
@@ -437,6 +605,12 @@ def apply_heal(target: Hero, amount: float, source: Hero):
         print(f"    {_hero_tag(source)} healed {_hero_tag(target)} for {amount:.0f}; {_hero_tag(target)} now has {target.hp:.0f} HP.")
 
 def execute_basic_attack(caster: Hero):
+    if caster.flags.get("selena_kit_enabled"):
+        _execute_selena_basic(caster)
+        caster.event_system.emit("on_basic_hit", caster=caster)
+        caster.energy = min(caster.energy + 50, 999)
+        return
+
     if caster.basic_attack_override:
         eff = caster.basic_attack_override
         # Delegate basic targeting to effect engine
@@ -541,6 +715,42 @@ all_heroes: List[Hero] = []
 def process_round_end(all_heroes: List[Hero]):
     global global_round
     global_round += 1
+
+    for hero in all_heroes:
+        if hero.name != "Selena":
+            continue
+        state = hero.flags.get("abyssal_eyes")
+        if not state:
+            continue
+
+        if not hero.is_alive:
+            _clear_abyssal_mark(hero)
+            continue
+
+        if state.get("pending_retarget"):
+            new_target = _pick_random_from_top_atk(hero, 3)
+            if new_target:
+                _set_abyssal_mark(
+                    hero,
+                    new_target,
+                    int(hero.flags.get("abyssal_initial_countdown", 6)),
+                    int(hero.flags.get("abyssal_speed_reduction", 200)),
+                )
+            continue
+
+        target = state.get("target")
+        if target is None or not target.is_alive:
+            state["pending_retarget"] = True
+            continue
+
+        burn = int(hero.flags.get("abyssal_end_round_energy_burn", 10))
+        target.energy = max(0, target.energy - burn)
+        print(f"    Abyssal Eyes drains {burn} energy from {_hero_tag(target)} at round end.")
+        state["countdown"] -= 1
+        print(f"    Abyssal Eyes countdown on {_hero_tag(target)} is now {state['countdown']}.")
+        if state["countdown"] <= 0:
+            _trigger_abyssal_punishment(hero)
+
     for hero in all_heroes:
         if not hero.is_alive:
             continue
@@ -601,6 +811,15 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
         
         for hero in acting_order:
             if not hero.is_alive:
+                continue
+
+            stun_until = hero.cc_states.get("stun", -1)
+            freeze_until = hero.cc_states.get("freeze", -1)
+            if isinstance(stun_until, int) and stun_until > global_round:
+                print(f"    {_hero_tag(hero)} is stunned and cannot act.")
+                continue
+            if isinstance(freeze_until, int) and freeze_until > global_round:
+                print(f"    {_hero_tag(hero)} is frozen and cannot act.")
                 continue
 
             if hero.energy >= 100:

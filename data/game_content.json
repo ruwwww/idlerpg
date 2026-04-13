@@ -98,6 +98,20 @@
           "target_lowest_hp": true
         }
       ]
+    },
+    "selena_abyssal_bloom": {
+      "name": "Abyssal Bloom",
+      "effects": [
+        {
+          "type": "selena_abyssal_bloom",
+          "mult": 1.2,
+          "stun_chance": 0.3,
+          "stun_duration": 2,
+          "countdown_reduce": 2,
+          "instant_trigger_threshold": 2,
+          "self_energy_gain": 20
+        }
+      ]
     }
   },
   "passives": {
@@ -205,6 +219,23 @@
           "target_self": true
         }
       ]
+    },
+    "selena_abyssal_eyes": {
+      "name": "Abyssal Contract",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_abyssal_eyes",
+          "top_n_atk": 3,
+          "initial_countdown": 6,
+          "end_round_energy_burn": 10,
+          "speed_reduction": 200,
+          "punishment_stun_rounds": 4,
+          "punishment_damage_taken_up_pct": 0.15,
+          "punishment_damage_taken_up_rounds": 3,
+          "punishment_heal_pct_max_hp": 0.5
+        }
+      ]
     }
   },
   "heroes": {
@@ -215,9 +246,7 @@
       "hp": 280000,
       "defense": 8500,
       "active_skill": "crashing_tide",
-      "passives": [
-        "freeze_on_hit"
-      ]
+      "passives": ["freeze_on_hit"]
     },
     "tara": {
       "name": "Tara",
@@ -226,9 +255,7 @@
       "hp": 320000,
       "defense": 12000,
       "active_skill": "seal_of_light",
-      "passives": [
-        "might_of_light"
-      ]
+      "passives": ["might_of_light"]
     },
     "basic_tank": {
       "name": "Basic Tank",
@@ -245,9 +272,7 @@
       "hp": 250000,
       "defense": 6000,
       "active_skill": "inverted_blessing",
-      "passives": [
-        "twisted_basic"
-      ]
+      "passives": ["twisted_basic"]
     },
     "dps": {
       "name": "DPS",
@@ -264,10 +289,7 @@
       "hp": 500000,
       "defense": 20000,
       "active_skill": "taunt_roar",
-      "passives": [
-        "taunt_aura",
-        "bulwark"
-      ]
+      "passives": ["taunt_aura", "bulwark"]
     },
     "enemy1": {
       "name": "Enemy1",
@@ -316,9 +338,7 @@
       "hp": 250000,
       "defense": 9000,
       "active_skill": "love_waves",
-      "passives": [
-        "love_protection"
-      ]
+      "passives": ["love_protection"]
     },
     "argus": {
       "name": "Argus",
@@ -327,10 +347,7 @@
       "hp": 200000,
       "defense": 10000,
       "active_skill": "demonic_grip",
-      "passives": [
-        "argus_slash",
-        "shield_resonance"
-      ]
+      "passives": ["argus_slash", "shield_resonance"]
     },
     "galatea": {
       "name": "Galatea",
@@ -339,25 +356,20 @@
       "hp": 150000,
       "defense": 4000,
       "active_skill": "galatea_dance",
-      "passives": [
-        "galatea_assassin"
-      ]
+      "passives": ["galatea_assassin"]
+    },
+    "selena": {
+      "name": "Selena",
+      "speed": 1280,
+      "atk": 54000,
+      "hp": 210000,
+      "defense": 7000,
+      "active_skill": "selena_abyssal_bloom",
+      "passives": ["selena_abyssal_eyes"]
     }
   },
   "teams": {
-    "team1_default": [
-      "galatea",
-      "argus",
-      "angela",
-      "fredrin",
-      "tara"
-    ],
-    "team2_default": [
-      "enemy1",
-      "enemy2",
-      "enemy3",
-      "enemy4",
-      "enemy5"
-    ]
+    "team1_default": ["fredrin", "tara", "galatea", "selena"],
+    "team2_default": ["enemy1", "enemy2"]
   }
 }
