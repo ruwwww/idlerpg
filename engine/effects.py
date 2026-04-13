@@ -1,0 +1,476 @@
+from __future__ import annotations
+
+import random
+from typing import Any, Callable, Dict, List
+
+from .models import Effect, EffectContext, Hero, Status
+from .utils import hero_tag
+
+
+CC_TAGS = {
+    "stun": ["cc", "disable"],
+    "freeze": ["cc", "disable"],
+    "taunt": ["cc", "target_control"],
+    "confusion": ["cc", "target_override"],
+    "seal_of_light": ["cc"],
+}
+
+CC_DATA = {
+    "taunt": {"force_target_source": True},
+    "confusion": {"target_allies": True},
+}
+
+
+class EffectExecutor:
+    def __init__(self, battle):
+        self.battle = battle
+        self.handlers: Dict[str, Callable[[Effect, EffectContext], None]] = {}
+        self._register_default_handlers()
+
+    def register(self, effect_type: str, handler: Callable[[Effect, EffectContext], None]):
+        self.handlers[effect_type] = handler
+
+    def execute_effect(self, effect: Effect, ctx: EffectContext):
+        handler = self.handlers.get(effect.type)
+        if not handler:
+            return
+        handler(effect, ctx)
+
+    def execute_list(self, effects: List[Effect], ctx: EffectContext):
+        for effect in effects:
+            self.execute_effect(effect, ctx)
+
+    def _resolve_targets(self, effect: Effect, ctx: EffectContext) -> List[Hero]:
+        target_def = effect.params.get("target")
+
+        # Backward compatibility with old JSON keys.
+        if effect.params.get("target_self"):
+            target_def = "self"
+        elif effect.params.get("target_all_enemies"):
+            target_def = "all_enemies"
+        elif effect.params.get("target_1_random_enemy"):
+            target_def = {"selector": "random_enemies", "n": 1}
+        elif effect.params.get("target_2_random_enemies"):
+            target_def = {"selector": "random_enemies", "n": 2}
+        elif effect.params.get("target_3_random_enemies"):
+            target_def = {"selector": "random_enemies", "n": 3}
+        elif effect.params.get("target_2_random_allies"):
+            target_def = {"selector": "random_allies", "n": 2}
+        elif effect.params.get("target_lowest_hp"):
+            target_def = "lowest_hp_enemy"
+
+        return self.battle.target_resolver.resolve(self.battle, ctx.caster, target_def, ctx)
+
+    def _condition_true(self, condition: Dict[str, Any], ctx: EffectContext) -> bool:
+        ctype = condition.get("type")
+
+        if ctype == "random_chance":
+            return random.random() < float(condition.get("chance", 0.0))
+
+        target_selector = condition.get("target", "self")
+        targets = self.battle.target_resolver.resolve(self.battle, ctx.caster, target_selector, ctx)
+        if not targets:
+            return False
+        target = targets[0]
+
+        if ctype == "hp_pct_below":
+            return (target.hp / max(1, target.max_hp)) < float(condition.get("value", 0.5))
+
+        if ctype == "stack_lte":
+            return target.stacks.get(condition.get("stack", ""), 0) <= int(condition.get("value", 0))
+
+        if ctype == "stack_gte":
+            return target.stacks.get(condition.get("stack", ""), 0) >= int(condition.get("value", 0))
+
+        if ctype == "status_exists":
+            return target.get_status(condition.get("status", "")) is not None
+
+        return False
+
+    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool):
+        amount = max(0.0, amount)
+
+        dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
+        if dr > 0:
+            amount *= max(0.0, 1.0 - dr)
+
+        dtu = sum(status.data.get("damage_taken_up", 0.0) for status in target.statuses)
+        if dtu > 0:
+            amount *= 1.0 + dtu
+
+        if amount > 0 and target.shield > 0:
+            absorbed = min(target.shield, amount)
+            target.shield -= absorbed
+            amount -= absorbed
+            print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
+
+        if amount > 0:
+            target.hp -= amount
+            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
+            print(f"    {hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
+            if target.hp <= 0:
+                target.is_alive = False
+                print(f"    {hero_tag(target)} has been defeated.")
+                self.battle.emit_event("on_death", caster, [target], {"dead": target, "event_source": caster, "event_target": target})
+
+        target.energy = min(999, target.energy + (20 if is_crit else 10))
+
+    def _register_default_handlers(self):
+        def h_damage(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            mult = float(effect.params.get("mult", 1.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                dmg = ctx.caster.compute_final_atk() * mult
+                hp_threshold_pct = effect.params.get("hp_threshold_pct")
+                if hp_threshold_pct is not None:
+                    if (target.hp / max(1, target.max_hp)) < (float(hp_threshold_pct) / 100.0):
+                        dmg *= float(effect.params.get("hp_threshold_mult", 1.0))
+
+                is_crit = random.random() < max(0.0, min(1.0, ctx.caster.crit_chance))
+                if is_crit:
+                    dmg *= ctx.caster.crit_damage
+
+                self._apply_damage(target, dmg, ctx.caster, is_crit)
+
+                shield_steal_pct = float(effect.params.get("shield_steal_pct", 0.0))
+                if shield_steal_pct > 0 and dmg > 0:
+                    gain = dmg * shield_steal_pct
+                    old = ctx.caster.shield
+                    ctx.caster.shield = min(ctx.caster.max_shield, ctx.caster.shield + gain)
+                    print(f"    {hero_tag(ctx.caster)} gained {ctx.caster.shield - old:.0f} shield.")
+
+        def h_heal(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            mult = float(effect.params.get("mult", 1.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                amount = ctx.caster.compute_final_atk() * mult
+                target.hp = min(target.max_hp, target.hp + amount)
+                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f}.")
+
+        def h_modify_stat(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            stat_type = effect.params.get("stat_type")
+            add = effect.params.get("add")
+            mult = effect.params.get("mult")
+            for target in targets:
+                if stat_type == "max_hp":
+                    if mult is not None:
+                        target.max_hp *= float(mult)
+                        target.hp = min(target.hp, target.max_hp)
+                        print(f"    {hero_tag(target)} max HP changed to {target.max_hp:.0f}.")
+                    continue
+                if not hasattr(target, stat_type):
+                    continue
+                current = getattr(target, stat_type)
+                if mult is not None:
+                    current *= float(mult)
+                if add is not None:
+                    current += float(add)
+                if stat_type == "energy":
+                    current = min(999, max(0, current))
+                if stat_type == "hp":
+                    current = min(target.max_hp, max(0, current))
+                setattr(target, stat_type, current)
+                print(f"    {hero_tag(target)} {stat_type} is now {current}.")
+
+        def h_apply_status(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            status_name = effect.params.get("status") or effect.params.get("cc_type")
+            duration = int(effect.params.get("duration", 1))
+            tags = list(effect.params.get("tags", []))
+            data = dict(effect.params.get("data", {}))
+            hooks = dict(effect.params.get("hooks", {}))
+
+            if status_name in CC_TAGS:
+                tags = list(set(tags + CC_TAGS[status_name]))
+                merged = dict(CC_DATA.get(status_name, {}))
+                merged.update(data)
+                data = merged
+
+            if effect.params.get("damage_reduction_pct") is not None and status_name == "taunt":
+                data["taunt_damage_reduction_pct"] = float(effect.params.get("damage_reduction_pct")) / 100.0
+
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+
+                incoming_is_cc = "cc" in tags
+                if incoming_is_cc and target.has_status_tag("cc_immunity"):
+                    print(f"    {hero_tag(target)} blocked {status_name} with CC Immunity.")
+                    target.statuses = [status for status in target.statuses if "cc_immunity" not in status.tags]
+                    continue
+
+                existing = target.get_status(status_name)
+                if existing:
+                    existing.duration = max(existing.duration, duration)
+                    existing.stacks += int(effect.params.get("stacks", 1))
+                    existing.tags = list(set(existing.tags + tags))
+                    existing.data.update(data)
+                    continue
+
+                status = Status(
+                    name=status_name,
+                    duration=duration,
+                    stacks=int(effect.params.get("stacks", 1)),
+                    tags=tags,
+                    data=data,
+                    hooks=hooks,
+                    source_name=ctx.caster.name,
+                )
+                target.statuses.append(status)
+                print(f"    {hero_tag(target)} gained status {status_name} ({duration} rounds).")
+
+                if "cc" in status.tags:
+                    self.battle.emit_event(
+                        "on_ally_receive_cc",
+                        ctx.caster,
+                        [target],
+                        {
+                            "target": target,
+                            "cc_type": status_name,
+                            "event_source": ctx.caster,
+                            "event_target": target,
+                        },
+                    )
+
+        def h_remove_status(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            status_name = effect.params.get("status")
+            tag = effect.params.get("tag")
+            for target in targets:
+                if not target:
+                    continue
+                before = len(target.statuses)
+                if status_name:
+                    target.statuses = [status for status in target.statuses if status.name != status_name]
+                elif tag:
+                    target.statuses = [status for status in target.statuses if tag not in status.tags]
+                if len(target.statuses) < before:
+                    print(f"    {hero_tag(target)} had status removed.")
+
+        def h_add_stack(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            stack_name = effect.params.get("stack")
+            amount = int(effect.params.get("amount", 1))
+            min_value = effect.params.get("min")
+            max_value = effect.params.get("max")
+            for target in targets:
+                target.stacks[stack_name] += amount
+                if min_value is not None:
+                    target.stacks[stack_name] = max(int(min_value), target.stacks[stack_name])
+                if max_value is not None:
+                    target.stacks[stack_name] = min(int(max_value), target.stacks[stack_name])
+                print(f"    {hero_tag(target)} stack {stack_name} = {target.stacks[stack_name]}.")
+
+        def h_set_stack(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            stack_name = effect.params.get("stack")
+            value = int(effect.params.get("value", 0))
+            for target in targets:
+                target.stacks[stack_name] = max(0, value)
+                print(f"    {hero_tag(target)} stack {stack_name} set to {target.stacks[stack_name]}.")
+
+        def h_consume_stack(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            stack_name = effect.params.get("stack")
+            amount = int(effect.params.get("amount", 1))
+            for target in targets:
+                target.stacks[stack_name] = max(0, target.stacks.get(stack_name, 0) - amount)
+                print(f"    {hero_tag(target)} consumed {amount} {stack_name} stack(s).")
+
+        def h_sequence(effect: Effect, ctx: EffectContext):
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
+            self.execute_list(nested, ctx)
+
+        def h_conditional(effect: Effect, ctx: EffectContext):
+            condition = effect.params.get("condition", {})
+            branch = effect.params.get("then", []) if self._condition_true(condition, ctx) else effect.params.get("else", [])
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in branch]
+            self.execute_list(nested, ctx)
+
+        def h_repeat(effect: Effect, ctx: EffectContext):
+            times = int(effect.params.get("times", 1))
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
+            for _ in range(max(0, times)):
+                self.execute_list(nested, ctx)
+
+        def h_heal_max_hp_pct(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                amount = target.max_hp * pct
+                target.hp = min(target.max_hp, target.hp + amount)
+                print(f"    {hero_tag(target)} recovered {amount:.0f} HP ({pct*100:.0f}% max HP).")
+
+        def h_random_choice(effect: Effect, ctx: EffectContext):
+            choices = effect.params.get("choices", [])
+            if not choices:
+                return
+            picked = random.choice(choices)
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in picked.get("effects", [])]
+            self.execute_list(nested, ctx)
+
+        def h_trigger_event(effect: Effect, ctx: EffectContext):
+            event_name = effect.params.get("event")
+            event_targets = self.battle.target_resolver.resolve(self.battle, ctx.caster, effect.params.get("target", "self"), ctx)
+            metadata = dict(effect.params.get("metadata", {}))
+            if event_targets:
+                metadata.setdefault("event_target", event_targets[0])
+            metadata.setdefault("event_source", ctx.caster)
+            self.battle.emit_event(event_name, ctx.caster, event_targets, metadata)
+
+        def h_listen_event(effect: Effect, ctx: EffectContext):
+            listener = {
+                "owner": ctx.caster,
+                "event": effect.params.get("event"),
+                "effects": effect.params.get("effects", []),
+                "duration": int(effect.params.get("duration", 9999)),
+            }
+            self.battle.listeners.append(listener)
+
+        def h_modify_behavior(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            key = effect.params.get("behavior")
+            value = effect.params.get("value")
+            duration = int(effect.params.get("duration", 1))
+            for target in targets:
+                target.behavior[key] = {"value": value, "until_round": self.battle.round + duration}
+                print(f"    {hero_tag(target)} behavior {key} modified for {duration} rounds.")
+
+        def h_apply_dot(effect: Effect, ctx: EffectContext):
+            dot_status = Effect(
+                "apply_status",
+                status=effect.params.get("status", "dot"),
+                duration=int(effect.params.get("duration", 2)),
+                tags=["dot", "debuff"],
+                hooks={
+                    "on_turn_end": [
+                        {
+                            "priority": 10,
+                            "timing": "normal",
+                            "type": "damage",
+                            "mult": float(effect.params.get("mult", 0.3)),
+                            "target": "self",
+                        }
+                    ]
+                },
+            )
+            h_apply_status(dot_status, ctx)
+
+        # Compatibility handlers for older content.
+        def h_apply_cc(effect: Effect, ctx: EffectContext):
+            mapped = Effect(
+                "apply_status",
+                status=effect.params.get("cc_type", "stun"),
+                duration=effect.params.get("duration", 1),
+                damage_reduction_pct=effect.params.get("damage_reduction_pct", 0),
+                target=effect.params.get("target"),
+                target_self=effect.params.get("target_self"),
+                target_all_enemies=effect.params.get("target_all_enemies"),
+                target_1_random_enemy=effect.params.get("target_1_random_enemy"),
+                target_2_random_enemies=effect.params.get("target_2_random_enemies"),
+                target_3_random_enemies=effect.params.get("target_3_random_enemies"),
+                target_lowest_hp=effect.params.get("target_lowest_hp"),
+            )
+            h_apply_status(mapped, ctx)
+
+        def h_apply_cc_immunity(effect: Effect, ctx: EffectContext):
+            mapped = Effect(
+                "apply_status",
+                status="cc_immunity",
+                duration=effect.params.get("duration", 2),
+                target=effect.params.get("target"),
+                target_2_random_allies=effect.params.get("target_2_random_allies"),
+                tags=["buff", "cc_immunity"],
+            )
+            h_apply_status(mapped, ctx)
+
+        def h_modify_heal(effect: Effect, ctx: EffectContext):
+            status = Effect(
+                "apply_status",
+                status="heal_invert",
+                duration=999,
+                target="self",
+                tags=["special"],
+            )
+            h_apply_status(status, ctx)
+
+        def h_override_basic(effect: Effect, ctx: EffectContext):
+            behavior = Effect(
+                "modify_behavior",
+                behavior="basic_override",
+                value={
+                    "is_damage": bool(effect.params.get("is_damage", effect.params.get("convert_to_damage", False))),
+                    "mult": float(effect.params.get("mult", 1.0)),
+                    "target": effect.params.get("target") or (
+                        {"selector": "random_enemies", "n": 2} if effect.params.get("target_2_random_enemies") else "all_allies"
+                    ),
+                    "shield_steal_pct": float(effect.params.get("shield_steal_pct", 0.0)),
+                    "persistent": bool(effect.params.get("persistent", False)),
+                },
+                duration=999 if effect.params.get("persistent", False) else 1,
+                target="self",
+            )
+            h_modify_behavior(behavior, ctx)
+
+        def h_angela_dispel(effect: Effect, ctx: EffectContext):
+            if random.random() > float(effect.params.get("chance", 0.3)):
+                return
+            targets = self.battle.target_resolver.resolve(self.battle, ctx.caster, effect.params.get("target", "event_target"), ctx)
+            if not targets:
+                return
+            target = targets[0]
+            cc_type = ctx.metadata.get("cc_type")
+            if cc_type:
+                target.statuses = [status for status in target.statuses if status.name != cc_type]
+            heal_mult = float(effect.params.get("heal_mult", 1.5))
+            heal_effect = Effect("heal", mult=heal_mult, target="event_target")
+            self.execute_effect(heal_effect, EffectContext(self.battle, ctx.caster, [target], ctx.event, ctx.round, ctx.metadata))
+            print(f"    {hero_tag(ctx.caster)} dispelled {cc_type} from {hero_tag(target)}.")
+
+        def h_apply_shield_resonance(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            for target in targets:
+                target.statuses.append(
+                    Status(
+                        name="shield_resonance",
+                        duration=999,
+                        tags=["buff"],
+                        data={
+                            "shield_dr": float(effect.params.get("dr_pct", 5)) / 100.0,
+                            "shield_cc_resist": float(effect.params.get("cc_resist_pct", 10)) / 100.0,
+                        },
+                        source_name=ctx.caster.name,
+                    )
+                )
+
+        self.register("damage", h_damage)
+        self.register("heal", h_heal)
+        self.register("apply_status", h_apply_status)
+        self.register("remove_status", h_remove_status)
+        self.register("add_stack", h_add_stack)
+        self.register("set_stack", h_set_stack)
+        self.register("consume_stack", h_consume_stack)
+        self.register("modify_stat", h_modify_stat)
+        self.register("sequence", h_sequence)
+        self.register("conditional", h_conditional)
+        self.register("repeat", h_repeat)
+        self.register("heal_max_hp_pct", h_heal_max_hp_pct)
+        self.register("random_choice", h_random_choice)
+        self.register("trigger_event", h_trigger_event)
+        self.register("listen_event", h_listen_event)
+        self.register("modify_behavior", h_modify_behavior)
+        self.register("apply_dot", h_apply_dot)
+
+        self.register("apply_cc", h_apply_cc)
+        self.register("apply_cc_immunity", h_apply_cc_immunity)
+        self.register("modify_heal", h_modify_heal)
+        self.register("override_basic", h_override_basic)
+        self.register("angela_dispel", h_angela_dispel)
+        self.register("apply_shield_resonance", h_apply_shield_resonance)
