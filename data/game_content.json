@@ -75,6 +75,17 @@
           "target_2_random_allies": true
         }
       ]
+    },
+    "demonic_grip": {
+      "name": "Demonic Grip",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.5,
+          "target_3_random_enemies": true,
+          "shield_steal_pct": 0.5
+        }
+      ]
     }
   },
   "passives": {
@@ -143,6 +154,31 @@
           "chance": 0.3,
           "heal_mult": 1.5,
           "use_event_target": true
+        }
+      ]
+    },
+    "argus_slash": {
+      "name": "Argus Slash",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "override_basic",
+          "persistent": true,
+          "is_damage": true,
+          "mult": 1.0,
+          "target_2_random_enemies": true,
+          "shield_steal_pct": 0.2
+        }
+      ]
+    },
+    "shield_resonance": {
+      "name": "Shield Resonance",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_shield_resonance",
+          "dr_pct": 5,
+          "cc_resist_pct": 10
         }
       ]
     }
@@ -259,11 +295,23 @@
       "passives": [
         "love_protection"
       ]
+    },
+    "argus": {
+      "name": "Argus",
+      "speed": 1150,
+      "atk": 60000,
+      "hp": 200000,
+      "defense": 10000,
+      "active_skill": "demonic_grip",
+      "passives": [
+        "argus_slash",
+        "shield_resonance"
+      ]
     }
   },
   "teams": {
     "team1_default": [
-      "mareia",
+      "argus",
       "angela",
       "fredrin",
       "tara",

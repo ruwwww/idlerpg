@@ -138,6 +138,8 @@ class Hero:
         self.atk = atk
         self.hp = hp
         self.max_hp = hp
+        self.shield = 0.0
+        self.max_shield = hp
         self.defense = defense
         self.energy = 0.0
         self.is_alive = True
@@ -172,6 +174,8 @@ def register_effect_handler(type_name: str, func: Callable):
 
 # --- Example handlers (add new ones here for crazy mechanics) ---
 def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    total_shield_gained = 0
+    shield_steal_pct = effect.params.get("shield_steal_pct", 0.0)
     for target in targets:
         if target is None or not target.is_alive:
             continue
@@ -184,6 +188,13 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
             reduction = target.cc_states["taunt"]["damage_reduction_pct"] / 100.0
             dmg *= (1 - reduction)
             print(f"      Taunt reduced damage by {reduction*100:.0f}%.")
+            
+        # Target shield passive damage reduction
+        if target.shield > 0 and target.flags.get("has_shield_dr_pct"):
+            shield_reduction = target.flags["has_shield_dr_pct"] / 100.0
+            dmg *= (1 - shield_reduction)
+            print(f"      {_hero_tag(target)}'s shield resonance reduced damage by {shield_reduction*100:.0f}%.")
+
         if context.get("damage_source") == "basic":
             print(
                 f"      {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, "
@@ -195,6 +206,12 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
                 f"dealing {dmg:.0f} damage."
             )
         apply_damage(target, dmg, context.get("is_crit", False))
+        
+        if shield_steal_pct > 0:
+            total_shield_gained += dmg * shield_steal_pct
+
+    if total_shield_gained > 0:
+        apply_shield(caster, total_shield_gained)
 
 def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     cc_type = effect.params["cc_type"]
@@ -203,6 +220,12 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
     for target in targets:
         if target is None or not target.is_alive:
             continue
+
+        if target.shield > 0 and target.flags.get("has_shield_cc_resist_pct"):
+            resist_chance = target.flags["has_shield_cc_resist_pct"] / 100.0
+            if random.random() < resist_chance:
+                print(f"      {_hero_tag(target)}'s shield resonated and resisted {cc_title}!")
+                continue
 
         # Check for CC immunity shield
         immune_buffs = [b for b in target.buffs if b.name == "cc_immunity"]
@@ -310,6 +333,12 @@ def _handle_angela_dispel(effect: Effect, caster: Hero, targets: List[Hero], con
             # update context so _handle_apply_cc knows it got blocked/dispelled
             context["dispelled"] = True
 
+def _handle_apply_shield_resonance(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    for target in targets:
+        target.flags["has_shield_dr_pct"] = effect.params.get("dr_pct", 5)
+        target.flags["has_shield_cc_resist_pct"] = effect.params.get("cc_resist_pct", 10)
+        print(f"      {_hero_tag(target)} now has shield resonance active.")
+
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
 register_effect_handler("override_basic", _handle_override_basic)
@@ -317,18 +346,35 @@ register_effect_handler("modify_heal", _handle_modify_heal)
 register_effect_handler("modify_stat", _handle_modify_stat)
 register_effect_handler("apply_cc_immunity", _handle_apply_cc_immunity)
 register_effect_handler("angela_dispel", _handle_angela_dispel)
+register_effect_handler("apply_shield_resonance", _handle_apply_shield_resonance)
 
 
 # ====================== CORE COMBAT FUNCTIONS ======================
+def apply_shield(target: Hero, amount: float):
+    if not target.is_alive:
+        return
+    old_shield = target.shield
+    target.shield = min(target.max_shield, target.shield + amount)
+    print(f"      {_hero_tag(target)} gained {target.shield - old_shield:.0f} shield! (Current: {target.shield:.0f}/{target.max_shield:.0f})")
+
 def apply_damage(target: Hero, amount: float, is_crit: bool = False):
     if not target.is_alive:
         return
-    target.hp -= max(0, amount)
-    print(f"        {_hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
-    if target.hp <= 0:
-        target.is_alive = False
-        target.event_system.emit("on_death", target=target)
-        print(f"        {_hero_tag(target)} has been defeated.")
+        
+    amount = max(0, amount)
+    if amount > 0 and target.shield > 0:
+        absorbed = min(target.shield, amount)
+        target.shield -= absorbed
+        amount -= absorbed
+        print(f"        {_hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
+        
+    if amount > 0:
+        target.hp -= amount
+        print(f"        {_hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
+        if target.hp <= 0:
+            target.is_alive = False
+            target.event_system.emit("on_death", target=target)
+            print(f"        {_hero_tag(target)} has been defeated.")
 
     # Idle Heroes energy gain on being hit
     gain = 20 if is_crit else 10
@@ -352,21 +398,19 @@ def apply_heal(target: Hero, amount: float, source: Hero):
 def execute_basic_attack(caster: Hero):
     if caster.basic_attack_override:
         eff = caster.basic_attack_override
-        # Example override: target allies + convert to damage
-        targets = [h for h in caster.team.heroes if h.is_alive] if eff.params.get("target_allies") else get_enemies(caster)
+        # Delegate basic targeting to effect engine
+        targets = get_targets_for_effect(eff, caster)
         _log_action(caster, "BASIC_OVERRIDE", targets, detail=f"params={eff.params}")
-        for t in targets:
-            if eff.params.get("convert_to_damage", False):
-                dmg = caster.compute_final_atk() * eff.params.get("mult", 1.0)
-                print(
-                    f"      {_hero_tag(caster)} launched an overridden strike on {_hero_tag(t)}, "
-                    f"dealing {dmg:.0f} damage."
-                )
-                apply_damage(t, dmg)
-            else:
-                # normal heal or whatever
-                pass
-        caster.basic_attack_override = None  # one-time use unless you want persistent
+        
+        if eff.params.get("convert_to_damage", False) or eff.params.get("is_damage", False):
+            _handle_damage(eff, caster, targets, {"damage_source": "basic"})
+        else:
+            # Just dispatch the effect directly if it has a type mapping
+            if eff.params.get("actual_type") in effect_handlers:
+                effect_handlers[eff.params["actual_type"]](eff, caster, targets, {"damage_source": "basic"})
+                
+        if not eff.params.get("persistent", False):
+            caster.basic_attack_override = None  # one-time use
     else:
         # Normal single-target enemy
         targets = [pick_target(caster)]
@@ -430,6 +474,12 @@ def get_targets_for_effect(effect: Effect, caster: Hero, context: Dict = None) -
     # Expand this for "all_enemies", "self", "random", etc.
     if effect.params.get("target_all_enemies"):
         return get_enemies(caster)
+    if effect.params.get("target_2_random_enemies"):
+        enemies = get_enemies(caster)
+        return random.sample(enemies, min(2, len(enemies))) if enemies else []
+    if effect.params.get("target_3_random_enemies"):
+        enemies = get_enemies(caster)
+        return random.sample(enemies, min(3, len(enemies))) if enemies else []
     if effect.params.get("target_2_random_allies"):
         allies = [h for h in caster.team.heroes if h.is_alive and h != caster]
         # If not enough non-caster allies, we can include the caster, but usually it meant other allies
