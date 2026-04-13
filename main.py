@@ -25,6 +25,54 @@ import random
 from collections import defaultdict
 from typing import Callable, Any, Dict, List
 
+from battle_ui import render_battle_ui
+
+
+def _hero_tag(hero: "Hero") -> str:
+    return f"[{hero.name}]"
+
+
+def _fmt_target_list(targets: List["Hero"]) -> str:
+    clean = [t for t in targets if t is not None]
+    if not clean:
+        return "no one"
+    if len(clean) == 1:
+        return clean[0].name
+    if len(clean) == 2:
+        return f"{clean[0].name} and {clean[1].name}"
+    return ", ".join(t.name for t in clean[:-1]) + f", and {clean[-1].name}"
+
+
+def _log_action(caster: "Hero", action: str, targets: List["Hero"], detail: str = ""):
+    target_text = _fmt_target_list(targets)
+    if action == "SKILL":
+        msg = f"    {_hero_tag(caster)} ({caster.hp:.0f}) cast [{detail}] targeting {target_text}."
+    elif action == "BASIC":
+        msg = f"    {_hero_tag(caster)} ({caster.hp:.0f}) attacked {target_text}."
+    elif action == "BASIC_OVERRIDE":
+        msg = f"    {_hero_tag(caster)} triggered a modified basic attack on {target_text} ({detail})."
+    else:
+        msg = f"    {_hero_tag(caster)} acts on {target_text}."
+    print(msg)
+
+
+def _log_effect(caster: "Hero", effect: "Effect", targets: List["Hero"]):
+    target_text = _fmt_target_list(targets)
+    if effect.type == "damage":
+        mult = effect.params.get("mult", 1.0)
+        print(f"      The damage effect ({mult:.2f}x) from {_hero_tag(caster)} is resolved against {target_text}.")
+    elif effect.type == "apply_cc":
+        cc_type = effect.params.get("cc_type", "unknown")
+        duration = effect.params.get("duration", 1)
+        print(f"      {_hero_tag(caster)} attempts to inflict {cc_type} on {target_text} for {duration} turn(s).")
+    elif effect.type == "modify_heal":
+        print(f"      {_hero_tag(caster)} altered healing behavior for this battle.")
+    elif effect.type == "override_basic":
+        print(f"      {_hero_tag(caster)} changed the next basic attack behavior.")
+    else:
+        params = ", ".join(f"{k}={v}" for k, v in effect.params.items()) or "no-params"
+        print(f"      {_hero_tag(caster)} triggered {effect.type} on {target_text} ({params}).")
+
 # ====================== EVENT SYSTEM ======================
 class EventSystem:
     def __init__(self):
@@ -98,6 +146,7 @@ class Hero:
         self.modifiers: Dict[str, List[Modifier]] = defaultdict(list)   # "damage", "heal", "basic_target"
         self.basic_attack_override: Effect | None = None
         self.stacks: Dict[str, int] = {}
+        self.cc_states: Dict[str, int] = {}
 
         self.event_system = EventSystem()    # per-hero listeners (for cross-hero effects)
 
@@ -118,19 +167,40 @@ def register_effect_handler(type_name: str, func: Callable):
 # --- Example handlers (add new ones here for crazy mechanics) ---
 def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     for target in targets:
+        if target is None or not target.is_alive:
+            continue
         dmg = caster.compute_final_atk() * effect.params.get("mult", 1.0)
         # Apply all damage modifiers in priority order
         for mod in sorted(caster.modifiers["damage"] + target.modifiers["damage"], key=lambda m: m.priority):
             dmg = mod.func(dmg, target, caster) or dmg
+        if context.get("damage_source") == "basic":
+            print(
+                f"      {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, "
+                f"dealing {dmg:.0f} damage."
+            )
+        else:
+            print(
+                f"      {_hero_tag(caster)}'s effect hit {_hero_tag(target)}, "
+                f"dealing {dmg:.0f} damage."
+            )
         apply_damage(target, dmg, context.get("is_crit", False))
 
 def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     cc_type = effect.params["cc_type"]
     duration = effect.params.get("duration", 1)
+    cc_title = cc_type.replace("_", " ").title()
     for target in targets:
+        if target is None or not target.is_alive:
+            continue
+        until_round = context["current_round"] + duration
+        target.cc_states[cc_type] = max(target.cc_states.get(cc_type, -1), until_round)
+        print(
+            f"      {cc_title} effect was applied to {_hero_tag(target)}, lasts for {duration} turn(s)."
+        )
         if cc_type == "seal_of_light":
             target.flags["passives_enabled"] = False
-            target.flags["sealed_until"] = context["current_round"] + duration
+            target.flags["sealed_until"] = until_round
+            print(f"      {_hero_tag(target)}'s passives are sealed until turn {until_round + 1}.")
             # Reset specific stacks (example)
             if "power_of_light" in target.stacks:
                 target.stacks["power_of_light"] = 0
@@ -138,12 +208,14 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
 
 def _handle_override_basic(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     caster.basic_attack_override = effect   # store for execute_basic_attack
+    print(f"      {_hero_tag(caster)} prepared a basic-attack override.")
 
 def _handle_modify_heal(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
     # Example: turn heal into damage
     def inverter(amt: float, t: Hero, s: Hero) -> float:
         return -amt
     caster.modifiers["heal"].append(Modifier("heal_inverter", inverter, priority=100))
+    print(f"      Healing inversion is now active around {_hero_tag(caster)}.")
 
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
@@ -156,9 +228,11 @@ def apply_damage(target: Hero, amount: float, is_crit: bool = False):
     if not target.is_alive:
         return
     target.hp -= max(0, amount)
+    print(f"        {_hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
     if target.hp <= 0:
         target.is_alive = False
         target.event_system.emit("on_death", target=target)
+        print(f"        {_hero_tag(target)} has been defeated.")
 
     # Idle Heroes energy gain on being hit
     gain = 20 if is_crit else 10
@@ -168,18 +242,30 @@ def apply_heal(target: Hero, amount: float, source: Hero):
     for mod in sorted(target.modifiers["heal"] + source.modifiers["heal"], key=lambda m: m.priority):
         amount = mod.func(amount, target, source) or amount
     if amount < 0:                     # healing inverted to damage
+        print(
+            f"      {_hero_tag(source)}'s heal was inverted and dealt {-amount:.0f} damage to {_hero_tag(target)}."
+        )
         apply_damage(target, -amount)
     else:
         target.hp = min(target.max_hp, target.hp + amount)
+        print(
+            f"      {_hero_tag(source)} healed {_hero_tag(target)} for {amount:.0f}; "
+            f"{_hero_tag(target)} now has {target.hp:.0f} HP."
+        )
 
 def execute_basic_attack(caster: Hero):
     if caster.basic_attack_override:
         eff = caster.basic_attack_override
         # Example override: target allies + convert to damage
         targets = [h for h in caster.team.heroes if h.is_alive] if eff.params.get("target_allies") else get_enemies(caster)
+        _log_action(caster, "BASIC_OVERRIDE", targets, detail=f"params={eff.params}")
         for t in targets:
             if eff.params.get("convert_to_damage", False):
                 dmg = caster.compute_final_atk() * eff.params.get("mult", 1.0)
+                print(
+                    f"      {_hero_tag(caster)} launched an overridden strike on {_hero_tag(t)}, "
+                    f"dealing {dmg:.0f} damage."
+                )
                 apply_damage(t, dmg)
             else:
                 # normal heal or whatever
@@ -188,7 +274,7 @@ def execute_basic_attack(caster: Hero):
     else:
         # Normal single-target enemy
         targets = [pick_target(caster)]
-        _handle_damage(Effect("damage", mult=1.0), caster, targets, {})
+        _handle_damage(Effect("damage", mult=1.0), caster, targets, {"damage_source": "basic"})
 
     # Trigger basic-attack events
     caster.event_system.emit("on_basic_hit", caster=caster)
@@ -197,9 +283,18 @@ def execute_basic_attack(caster: Hero):
     caster.energy = min(caster.energy + 50, 999)
 
 def execute_skill(caster: Hero, skill: Skill, overcharge_bonus: float = 0.0):
+    _log_action(caster, "SKILL", get_enemies(caster), detail=f"{skill.name}")
+    if overcharge_bonus > 0:
+        print(f"      Overcharge bonus active: {overcharge_bonus*100:.0f}%.")
     for effect in skill.effects:
         targets = get_targets_for_effect(effect, caster)   # you can expand this
-        context = {"current_round": global_round, "overcharge": overcharge_bonus}
+        context = {
+            "current_round": global_round,
+            "overcharge": overcharge_bonus,
+            "damage_source": "skill",
+            "skill_name": skill.name,
+        }
+        _log_effect(caster, effect, targets)
         if effect.type in effect_handlers:
             effect_handlers[effect.type](effect, caster, targets, context)
     caster.event_system.emit("after_skill", caster=caster)
@@ -242,8 +337,12 @@ def process_round_end(all_heroes: List[Hero]):
             b.duration -= 1
             if b.duration <= 0:
                 hero.buffs.remove(b)
+        # Expire CC states.
+        for cc_name, until_round in list(hero.cc_states.items()):
+            if until_round <= global_round:
+                del hero.cc_states[cc_name]
         # Unseal if time is up
-        if hero.flags.get("sealed_until", -1) == global_round:
+        if hero.flags.get("sealed_until", -1) <= global_round:
             hero.flags["passives_enabled"] = True
 
 
@@ -265,30 +364,31 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
 
     print("=== FIGHT START ===\n")
     while any(h.is_alive for h in team1.heroes) and any(h.is_alive for h in team2.heroes) and global_round < max_rounds:
+        print(f"Turn {global_round + 1}")
+        # render_battle_ui(team1, team2, global_round)
         # Sort by speed descending, ties broken by team slot order
         acting_order = sorted(all_heroes, key=lambda h: (-h.speed, all_heroes.index(h)))
         
         for hero in acting_order:
             if not hero.is_alive:
                 continue
-            final_atk = hero.compute_final_atk()
-
-            print(f"Round {global_round+1} | {hero.name} (Energy: {hero.energy:.0f}) → ", end="")
 
             if hero.energy >= 100:
                 over = hero.energy - 100
                 bonus = over * 0.01   # +1% skill damage per excess energy
-                print(f"SKILL {hero.active_skill.name} (bonus {bonus*100:.0f}%)")
-                execute_skill(hero, hero.active_skill, bonus)
+                if hero.active_skill:
+                    execute_skill(hero, hero.active_skill, bonus)
+                else:
+                    execute_basic_attack(hero)
                 hero.energy = 0
             else:
-                print("BASIC ATTACK")
                 execute_basic_attack(hero)
 
             # Trigger passives for this action
             trigger_passives(hero, "after_action")
 
         process_round_end(all_heroes)
+        print("")
 
     print("\n=== FIGHT END ===")
     for t in [team1, team2]:
