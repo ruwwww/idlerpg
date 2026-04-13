@@ -91,11 +91,51 @@
       "name": "Death Barrage",
       "effects": [
         {
-          "type": "galatea_barrage",
-          "mult": 0.8,
-          "speed_bonus": 500,
-          "duration": 2,
-          "target_lowest_hp": true
+          "type": "sequence",
+          "effects": [
+            {
+              "type": "repeat",
+              "times": 4,
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.8,
+                  "target": "lowest_hp_enemy"
+                }
+              ]
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "hp_pct_below",
+                "target": "lowest_hp_enemy",
+                "value": 0.3
+              },
+              "then": [
+                {
+                  "type": "repeat",
+                  "times": 2,
+                  "effects": [
+                    {
+                      "type": "damage",
+                      "mult": 0.8,
+                      "target": "lowest_hp_enemy"
+                    }
+                  ]
+                },
+                {
+                  "type": "apply_status",
+                  "status": "speed_surge",
+                  "duration": 2,
+                  "target": "self",
+                  "tags": ["buff"],
+                  "data": {
+                    "speed_delta": 500
+                  }
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -103,13 +143,104 @@
       "name": "Abyssal Bloom",
       "effects": [
         {
-          "type": "selena_abyssal_bloom",
-          "mult": 1.2,
-          "stun_chance": 0.3,
-          "stun_duration": 2,
-          "countdown_reduce": 2,
-          "instant_trigger_threshold": 2,
-          "self_energy_gain": 20
+          "type": "sequence",
+          "effects": [
+            {
+              "type": "damage",
+              "mult": 1.2,
+              "target": {
+                "selector": "marked_and_top_atk_others",
+                "status": "abyssal_eyes",
+                "n": 2
+              }
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "random_chance",
+                "chance": 0.3
+              },
+              "then": [
+                {
+                  "type": "apply_status",
+                  "status": "stun",
+                  "duration": 2,
+                  "target": {
+                    "selector": "marked_and_top_atk_others",
+                    "status": "abyssal_eyes",
+                    "n": 2
+                  },
+                  "tags": ["cc"]
+                }
+              ]
+            },
+            {
+              "type": "add_stack",
+              "stack": "abyssal_countdown",
+              "amount": -2,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              }
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "stack_lte",
+                "target": {
+                  "selector": "marked_target",
+                  "status": "abyssal_eyes"
+                },
+                "stack": "abyssal_countdown",
+                "value": 2
+              },
+              "then": [
+                {
+                  "type": "apply_status",
+                  "status": "stun",
+                  "duration": 4,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  },
+                  "tags": ["cc"]
+                },
+                {
+                  "type": "apply_status",
+                  "status": "abyssal_punishment",
+                  "duration": 3,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  },
+                  "tags": ["debuff"],
+                  "data": {
+                    "damage_taken_up": 0.15
+                  }
+                },
+                {
+                  "type": "heal_max_hp_pct",
+                  "pct": 0.5,
+                  "target": "self"
+                },
+                {
+                  "type": "set_stack",
+                  "stack": "abyssal_countdown",
+                  "value": 6,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "modify_stat",
+              "stat_type": "energy",
+              "add": 20,
+              "target": "self"
+            }
+          ]
         }
       ]
     }
@@ -225,15 +356,189 @@
       "trigger_event": "on_create",
       "effects": [
         {
-          "type": "apply_abyssal_eyes",
-          "top_n_atk": 3,
-          "initial_countdown": 6,
-          "end_round_energy_burn": 10,
-          "speed_reduction": 200,
-          "punishment_stun_rounds": 4,
-          "punishment_damage_taken_up_pct": 0.15,
-          "punishment_damage_taken_up_rounds": 3,
-          "punishment_heal_pct_max_hp": 0.5
+          "type": "sequence",
+          "effects": [
+            {
+              "type": "apply_status",
+              "status": "abyssal_eyes",
+              "duration": 999,
+              "target": {
+                "selector": "random_top_atk_enemies",
+                "top_n": 3,
+                "n": 1
+              },
+              "tags": ["mark", "debuff"],
+              "data": {
+                "speed_delta": -200
+              }
+            },
+            {
+              "type": "set_stack",
+              "stack": "abyssal_countdown",
+              "value": 6,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              }
+            },
+            {
+              "type": "modify_behavior",
+              "behavior": "basic_target",
+              "value": {
+                "selector": "marked_plus_random_enemy",
+                "status": "abyssal_eyes"
+              },
+              "duration": 999,
+              "target": "self"
+            },
+            {
+              "type": "listen_event",
+              "event": "round_end",
+              "duration": 999,
+              "effects": [
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "status_exists",
+                    "target": {
+                      "selector": "marked_target",
+                      "status": "abyssal_eyes"
+                    },
+                    "status": "abyssal_eyes"
+                  },
+                  "then": [
+                    {
+                      "type": "modify_stat",
+                      "stat_type": "energy",
+                      "add": -10,
+                      "target": {
+                        "selector": "marked_target",
+                        "status": "abyssal_eyes"
+                      }
+                    },
+                    {
+                      "type": "add_stack",
+                      "stack": "abyssal_countdown",
+                      "amount": -1,
+                      "target": {
+                        "selector": "marked_target",
+                        "status": "abyssal_eyes"
+                      }
+                    },
+                    {
+                      "type": "conditional",
+                      "condition": {
+                        "type": "stack_lte",
+                        "target": {
+                          "selector": "marked_target",
+                          "status": "abyssal_eyes"
+                        },
+                        "stack": "abyssal_countdown",
+                        "value": 0
+                      },
+                      "then": [
+                        {
+                          "type": "apply_status",
+                          "status": "stun",
+                          "duration": 4,
+                          "target": {
+                            "selector": "marked_target",
+                            "status": "abyssal_eyes"
+                          },
+                          "tags": ["cc"]
+                        },
+                        {
+                          "type": "apply_status",
+                          "status": "abyssal_punishment",
+                          "duration": 3,
+                          "target": {
+                            "selector": "marked_target",
+                            "status": "abyssal_eyes"
+                          },
+                          "tags": ["debuff"],
+                          "data": {
+                            "damage_taken_up": 0.15
+                          }
+                        },
+                        {
+                          "type": "heal_max_hp_pct",
+                          "pct": 0.5,
+                          "target": "self"
+                        },
+                        {
+                          "type": "set_stack",
+                          "stack": "abyssal_countdown",
+                          "value": 6,
+                          "target": {
+                            "selector": "marked_target",
+                            "status": "abyssal_eyes"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "type": "apply_status",
+                      "status": "abyssal_eyes",
+                      "duration": 999,
+                      "target": {
+                        "selector": "random_top_atk_enemies",
+                        "top_n": 3,
+                        "n": 1
+                      },
+                      "tags": ["mark", "debuff"],
+                      "data": {
+                        "speed_delta": -200
+                      }
+                    },
+                    {
+                      "type": "set_stack",
+                      "stack": "abyssal_countdown",
+                      "value": 6,
+                      "target": {
+                        "selector": "marked_target",
+                        "status": "abyssal_eyes"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "selena_basic_protocol": {
+      "name": "Abyssal Basic Protocol",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "remove_status",
+          "status": "cc_immunity",
+          "target": {
+            "selector": "marked_plus_random_enemy",
+            "status": "abyssal_eyes"
+          }
+        },
+        {
+          "type": "add_stack",
+          "stack": "abyssal_countdown",
+          "amount": -1,
+          "target": {
+            "selector": "marked_target",
+            "status": "abyssal_eyes"
+          }
+        },
+        {
+          "type": "apply_status",
+          "status": "selena_guard",
+          "duration": 1,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "damage_reduction": 0.05
+          }
         }
       ]
     }
@@ -364,8 +669,10 @@
       "atk": 54000,
       "hp": 210000,
       "defense": 7000,
+      "role": "mage",
+      "type": "cc",
       "active_skill": "selena_abyssal_bloom",
-      "passives": ["selena_abyssal_eyes"]
+      "passives": ["selena_abyssal_eyes", "selena_basic_protocol"]
     }
   },
   "teams": {
