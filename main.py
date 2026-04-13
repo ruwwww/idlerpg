@@ -176,6 +176,11 @@ def _handle_damage(effect: Effect, caster: Hero, targets: List[Hero], context: D
         # Apply all damage modifiers in priority order
         for mod in sorted(caster.modifiers["damage"] + target.modifiers["damage"], key=lambda m: m.priority):
             dmg = mod.func(dmg, target, caster) or dmg
+        # Taunt damage reduction
+        if "taunt" in target.cc_states and target.cc_states["taunt"]["taunter"] == caster.name:
+            reduction = target.cc_states["taunt"]["damage_reduction_pct"] / 100.0
+            dmg *= (1 - reduction)
+            print(f"      Taunt reduced damage by {reduction*100:.0f}%.")
         if context.get("damage_source") == "basic":
             print(
                 f"      {_hero_tag(caster)} ({caster.hp:.0f}) attacked {_hero_tag(target)}, "
@@ -196,7 +201,14 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
         if target is None or not target.is_alive:
             continue
         until_round = context["current_round"] + duration
-        target.cc_states[cc_type] = max(target.cc_states.get(cc_type, -1), until_round)
+        if cc_type == "taunt":
+            target.cc_states[cc_type] = {
+                "until": until_round,
+                "taunter": caster.name,
+                "damage_reduction_pct": effect.params.get("damage_reduction_pct", 0)
+            }
+        else:
+            target.cc_states[cc_type] = max(target.cc_states.get(cc_type, -1), until_round)
         print(
             f"      {cc_title} effect was applied to {_hero_tag(target)}, lasts for {duration} turn(s)."
         )
@@ -220,10 +232,22 @@ def _handle_modify_heal(effect: Effect, caster: Hero, targets: List[Hero], conte
     caster.modifiers["heal"].append(Modifier("heal_inverter", inverter, priority=100))
     print(f"      Healing inversion is now active around {_hero_tag(caster)}.")
 
+
+def _handle_modify_stat(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    for target in targets:
+        stat_type = effect.params.get("stat_type")
+        if stat_type == "max_hp":
+            mult = effect.params.get("mult", 1.0)
+            target.max_hp *= mult
+            target.hp = min(target.hp, target.max_hp)
+            print(f"      {_hero_tag(target)}'s max HP increased to {target.max_hp:.0f}.")
+
+
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
 register_effect_handler("override_basic", _handle_override_basic)
 register_effect_handler("modify_heal", _handle_modify_heal)
+register_effect_handler("modify_stat", _handle_modify_stat)
 
 
 # ====================== CORE COMBAT FUNCTIONS ======================
@@ -318,6 +342,13 @@ def get_enemies(caster: Hero):
     return [h for h in caster.team.opposite.heroes if h.is_alive]
 
 def pick_target(caster: Hero):
+    global all_heroes
+    taunt_state = caster.cc_states.get("taunt")
+    if taunt_state and taunt_state["until"] > global_round:
+        taunter_name = taunt_state["taunter"]
+        for h in all_heroes:
+            if h.name == taunter_name and h.is_alive:
+                return h
     enemies = get_enemies(caster)
     return min(enemies, key=lambda h: h.hp) if enemies else None
 
@@ -328,6 +359,7 @@ def get_targets_for_effect(effect: Effect, caster: Hero) -> List[Hero]:
     return [caster] if effect.params.get("target_self") else [pick_target(caster)] or []
 
 global_round = 0
+all_heroes: List[Hero] = []
 
 def process_round_end(all_heroes: List[Hero]):
     global global_round
@@ -341,8 +373,10 @@ def process_round_end(all_heroes: List[Hero]):
             if b.duration <= 0:
                 hero.buffs.remove(b)
         # Expire CC states.
-        for cc_name, until_round in list(hero.cc_states.items()):
-            if until_round <= global_round:
+        for cc_name, state in list(hero.cc_states.items()):
+            if isinstance(state, dict) and state.get("until", 0) <= global_round:
+                del hero.cc_states[cc_name]
+            elif isinstance(state, int) and state <= global_round:
                 del hero.cc_states[cc_name]
         # Unseal if time is up
         if hero.flags.get("sealed_until", -1) <= global_round:
@@ -367,10 +401,15 @@ def build_default_teams() -> tuple[Team, Team]:
     runtime_factory = HeroRuntimeFactory(source, Hero, Skill, Passive, Effect)
     team1 = Team(runtime_factory.create_team_heroes("team1_default"), 1)
     team2 = Team(runtime_factory.create_team_heroes("team2_default"), 2)
+    team1.opposite = team2
+    team2.opposite = team1
+    # Apply on_create passives after teams are set
+    for hero in team1.heroes + team2.heroes:
+        trigger_passives(hero, "on_create", current_round=0)
     return team1, team2
 
 def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
-    global global_round
+    global global_round, all_heroes
     global_round = 0
     all_heroes = team1.heroes + team2.heroes
     team1.opposite = team2
@@ -402,6 +441,10 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
             trigger_passives(hero, "after_action")
 
         process_round_end(all_heroes)
+        # Trigger turn_start passives
+        for hero in all_heroes:
+            if hero.is_alive:
+                trigger_passives(hero, "turn_start", current_round=global_round)
         print("")
 
     print("\n=== FIGHT END ===")

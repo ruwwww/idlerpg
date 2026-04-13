@@ -21,6 +21,18 @@
         { "type": "modify_heal" },
         { "type": "damage", "mult": 0.9, "target_all_enemies": true }
       ]
+    },
+    "taunt_roar": {
+      "name": "Taunt Roar",
+      "effects": [
+        {
+          "type": "apply_cc",
+          "cc_type": "taunt",
+          "duration": 2,
+          "damage_reduction_pct": 50,
+          "target_all_enemies": true
+        }
+      ]
     }
   },
   "passives": {
@@ -44,6 +56,24 @@
           "convert_to_damage": true
         }
       ]
+    },
+    "taunt_aura": {
+      "name": "Taunt Aura",
+      "trigger_event": "turn_start",
+      "effects": [
+        {
+          "type": "apply_cc",
+          "cc_type": "taunt",
+          "duration": 1,
+          "damage_reduction_pct": 30,
+          "target_all_enemies": true
+        }
+      ]
+    },
+    "bulwark": {
+      "name": "Bulwark",
+      "trigger_event": "on_create",
+      "effects": [{ "type": "modify_stat", "stat_type": "max_hp", "mult": 1.1 }]
     }
   },
   "heroes": {
@@ -90,6 +120,15 @@
       "defense": 5000,
       "passives": []
     },
+    "fredrin": {
+      "name": "Fredrin",
+      "speed": 800,
+      "atk": 35000,
+      "hp": 500000,
+      "defense": 20000,
+      "active_skill": "taunt_roar",
+      "passives": ["taunt_aura", "bulwark"]
+    },
     "enemy1": {
       "name": "Enemy1",
       "speed": 950,
@@ -132,7 +171,7 @@
     }
   },
   "teams": {
-    "team1_default": ["mareia", "tara", "basic_tank", "inverter", "dps"],
+    "team1_default": ["mareia", "tara", "fredrin", "inverter", "dps"],
     "team2_default": ["enemy1", "enemy2", "enemy3", "enemy4", "enemy5"]
   }
 }
