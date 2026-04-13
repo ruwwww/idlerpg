@@ -461,6 +461,9 @@ def get_targets_for_effect(effect: Effect, caster: Hero, context: Dict = None) -
     # Expand this for "all_enemies", "self", "random", etc.
     if effect.params.get("target_all_enemies"):
         return get_enemies(caster)
+    if effect.params.get("target_1_random_enemy"):
+        enemies = get_enemies(caster)
+        return random.sample(enemies, min(1, len(enemies))) if enemies else []
     if effect.params.get("target_2_random_enemies"):
         enemies = get_enemies(caster)
         return random.sample(enemies, min(2, len(enemies))) if enemies else []
