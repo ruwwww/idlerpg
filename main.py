@@ -23,9 +23,12 @@
 
 import random
 from collections import defaultdict
+from pathlib import Path
 from typing import Callable, Any, Dict, List
 
 from battle_ui import render_battle_ui
+from content_loader import JsonHeroContentSource
+from hero_factory import HeroRuntimeFactory
 
 
 def _hero_tag(hero: "Hero") -> str:
@@ -355,6 +358,17 @@ class Team:
             h.team = self
         self.opposite = None   # set after both teams created
 
+
+def build_default_teams() -> tuple[Team, Team]:
+    content_path = Path(__file__).parent / "data" / "game_content.json"
+    source = JsonHeroContentSource(str(content_path))
+    source.validate_effect_types(set(effect_handlers.keys()))
+
+    runtime_factory = HeroRuntimeFactory(source, Hero, Skill, Passive, Effect)
+    team1 = Team(runtime_factory.create_team_heroes("team1_default"), 1)
+    team2 = Team(runtime_factory.create_team_heroes("team2_default"), 2)
+    return team1, team2
+
 def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
     global global_round
     global_round = 0
@@ -396,71 +410,8 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
         print(f"Team {t.number}: {alive}/5 alive")
 
 
-# ====================== HERO FACTORIES (data-driven style) ======================
-def create_mareia_like() -> Hero:
-    h = Hero("Mareia", speed=1250, atk=52000, hp=280000, defense=8500)
-    h.active_skill = Skill("Crashing Tide", [
-        Effect("damage", mult=1.3, target_all_enemies=True),
-        Effect("damage", mult=0.8, target_all_enemies=True),   # extra conditional in real game
-        Effect("apply_cc", cc_type="freeze", duration=1)
-    ])
-    h.passives = [
-        Passive("Freeze on Hit", "on_basic_hit", [Effect("apply_cc", cc_type="freeze", duration=1)])
-    ]
-    return h
-
-
-def create_tara_like() -> Hero:
-    h = Hero("Tara", speed=1180, atk=48000, hp=320000, defense=12000)
-    h.active_skill = Skill("Seal of Light", [
-        Effect("apply_cc", cc_type="seal_of_light", duration=3),
-        Effect("damage", mult=1.2, target_all_enemies=True)
-    ])
-    # Passive that would be disabled by her own seal if she were enemy
-    h.passives = [Passive("Might of Light", "after_skill", [Effect("damage", mult=0.5)])]
-    return h
-
-
-def create_heal_inverter_support() -> Hero:
-    h = Hero("Inverter", speed=1100, atk=30000, hp=250000, defense=6000)
-    h.active_skill = Skill("Inverted Blessing", [
-        Effect("modify_heal"),   # registers inverter
-        Effect("damage", mult=0.9, target_all_enemies=True)
-    ])
-    # Passive that forces basic attack to hit allies as damage
-    h.passives = [
-        Passive("Twisted Basic", "on_basic_hit", [
-            Effect("override_basic", target_allies=True, convert_to_damage=True)
-        ])
-    ]
-    return h
-
-
 # ====================== RUN EXAMPLE ======================
 if __name__ == "__main__":
-    # Team 1 - normal + complex heroes
-    team1_heroes = [
-        create_mareia_like(),
-        create_tara_like(),
-        Hero("Basic Tank", 900, 40000, 400000, 15000),
-        create_heal_inverter_support(),
-        Hero("DPS", 1300, 65000, 180000, 5000)
-    ]
-    team1 = Team(team1_heroes, 1)
-
-    # Team 2 - simple enemies
-    team2_heroes = [
-        Hero("Enemy1", 950, 45000, 300000, 9000),
-        Hero("Enemy2", 1100, 55000, 250000, 7000),
-        Hero("Enemy3", 1000, 48000, 280000, 8000),
-        Hero("Enemy4", 1200, 52000, 220000, 6000),
-        Hero("Enemy5", 1050, 50000, 260000, 7500)
-    ]
-    team2 = Team(team2_heroes, 2)
+    team1, team2 = build_default_teams()
 
     simulate_fight(team1, team2, max_rounds=30)
-
-    # How to make it fully data-driven later:
-    # 1. Save heroes as JSON with "active_skill": {"effects": [...]}
-    # 2. Write a loader that creates Effect objects from dicts
-    # 3. Add new Effect types + handlers without touching the loop

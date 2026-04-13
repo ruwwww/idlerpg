@@ -1,0 +1,138 @@
+{
+  "skills": {
+    "crashing_tide": {
+      "name": "Crashing Tide",
+      "effects": [
+        { "type": "damage", "mult": 1.3, "target_all_enemies": true },
+        { "type": "damage", "mult": 0.8, "target_all_enemies": true },
+        { "type": "apply_cc", "cc_type": "freeze", "duration": 1 }
+      ]
+    },
+    "seal_of_light": {
+      "name": "Seal of Light",
+      "effects": [
+        { "type": "apply_cc", "cc_type": "seal_of_light", "duration": 3 },
+        { "type": "damage", "mult": 1.2, "target_all_enemies": true }
+      ]
+    },
+    "inverted_blessing": {
+      "name": "Inverted Blessing",
+      "effects": [
+        { "type": "modify_heal" },
+        { "type": "damage", "mult": 0.9, "target_all_enemies": true }
+      ]
+    }
+  },
+  "passives": {
+    "freeze_on_hit": {
+      "name": "Freeze on Hit",
+      "trigger_event": "on_basic_hit",
+      "effects": [{ "type": "apply_cc", "cc_type": "freeze", "duration": 1 }]
+    },
+    "might_of_light": {
+      "name": "Might of Light",
+      "trigger_event": "after_skill",
+      "effects": [{ "type": "damage", "mult": 0.5 }]
+    },
+    "twisted_basic": {
+      "name": "Twisted Basic",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "override_basic",
+          "target_allies": true,
+          "convert_to_damage": true
+        }
+      ]
+    }
+  },
+  "heroes": {
+    "mareia": {
+      "name": "Mareia",
+      "speed": 1250,
+      "atk": 52000,
+      "hp": 280000,
+      "defense": 8500,
+      "active_skill": "crashing_tide",
+      "passives": ["freeze_on_hit"]
+    },
+    "tara": {
+      "name": "Tara",
+      "speed": 1180,
+      "atk": 48000,
+      "hp": 320000,
+      "defense": 12000,
+      "active_skill": "seal_of_light",
+      "passives": ["might_of_light"]
+    },
+    "basic_tank": {
+      "name": "Basic Tank",
+      "speed": 900,
+      "atk": 40000,
+      "hp": 400000,
+      "defense": 15000,
+      "passives": []
+    },
+    "inverter": {
+      "name": "Inverter",
+      "speed": 1100,
+      "atk": 30000,
+      "hp": 250000,
+      "defense": 6000,
+      "active_skill": "inverted_blessing",
+      "passives": ["twisted_basic"]
+    },
+    "dps": {
+      "name": "DPS",
+      "speed": 1300,
+      "atk": 65000,
+      "hp": 180000,
+      "defense": 5000,
+      "passives": []
+    },
+    "enemy1": {
+      "name": "Enemy1",
+      "speed": 950,
+      "atk": 45000,
+      "hp": 300000,
+      "defense": 9000,
+      "passives": []
+    },
+    "enemy2": {
+      "name": "Enemy2",
+      "speed": 1100,
+      "atk": 55000,
+      "hp": 250000,
+      "defense": 7000,
+      "passives": []
+    },
+    "enemy3": {
+      "name": "Enemy3",
+      "speed": 1000,
+      "atk": 48000,
+      "hp": 280000,
+      "defense": 8000,
+      "passives": []
+    },
+    "enemy4": {
+      "name": "Enemy4",
+      "speed": 1200,
+      "atk": 52000,
+      "hp": 220000,
+      "defense": 6000,
+      "passives": []
+    },
+    "enemy5": {
+      "name": "Enemy5",
+      "speed": 1050,
+      "atk": 50000,
+      "hp": 260000,
+      "defense": 7500,
+      "passives": []
+    }
+  },
+  "teams": {
+    "team1_default": ["mareia", "tara", "basic_tank", "inverter", "dps"],
+    "team2_default": ["enemy1", "enemy2", "enemy3", "enemy4", "enemy5"]
+  }
+}
