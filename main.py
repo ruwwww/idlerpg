@@ -200,7 +200,18 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
     for target in targets:
         if target is None or not target.is_alive:
             continue
-        until_round = context["current_round"] + duration
+
+        # Check for CC immunity shield
+        immune_buffs = [b for b in target.buffs if b.name == "cc_immunity"]
+        if immune_buffs:
+            b = immune_buffs[0]
+            target.buffs.remove(b)
+            print(f"      {_hero_tag(target)} blocked {cc_title} with CC Immunity shield!")
+            heal_src = getattr(b, "source_hero", target)
+            apply_heal(target, b.value, heal_src)
+            continue
+
+        until_round = context.get("current_round", 0) + duration
         if cc_type == "taunt":
             target.cc_states[cc_type] = {
                 "until": until_round,
@@ -219,6 +230,20 @@ def _handle_apply_cc(effect: Effect, caster: Hero, targets: List[Hero], context:
             # Reset specific stacks (example)
             if "power_of_light" in target.stacks:
                 target.stacks["power_of_light"] = 0
+
+        # Trigger on_ally_receive_cc for all allies so they can dispel it
+        for ally in target.team.heroes:
+            if ally.is_alive:
+                trigger_context = {
+                    "current_round": context.get("current_round", 0),
+                    "target": target,
+                    "cc_type": cc_type,
+                    "dispelled": False
+                }
+                trigger_passives(ally, "on_ally_receive_cc", trigger_context)
+                # If dispelled, break out of checking more allies
+                if trigger_context.get("dispelled"):
+                    break
         # You can add more CC types easily
 
 def _handle_override_basic(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
@@ -242,12 +267,53 @@ def _handle_modify_stat(effect: Effect, caster: Hero, targets: List[Hero], conte
             target.hp = min(target.hp, target.max_hp)
             print(f"      {_hero_tag(target)}'s max HP increased to {target.max_hp:.0f}.")
 
+def _handle_apply_cc_immunity(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    heal_mult = effect.params.get("heal_mult", 2.0)
+    duration = effect.params.get("duration", 2)
+    heal_amt = caster.compute_final_atk() * heal_mult
+    for target in targets:
+        # Buff constructor: name, value, duration...
+        b = Buff("cc_immunity", heal_amt, duration)
+        # Hack to attach heal source to buff
+        b.source_hero = caster
+        target.buffs.append(b)
+        print(f"      {_hero_tag(caster)} granted CC Immunity to {_hero_tag(target)} for {duration} turn(s).")
+
+def _handle_angela_dispel(effect: Effect, caster: Hero, targets: List[Hero], context: Dict):
+    triggered_round = context.get("current_round", global_round)
+    # Check if passive triggered this turn
+    if caster.stacks.get("angela_passive_triggered") == triggered_round:
+        return
+    
+    chance = effect.params.get("chance", 0.3)
+    if random.random() > chance:
+        return
+        
+    for target in targets:
+        cc_type = context.get("cc_type")
+        if cc_type and cc_type in target.cc_states:
+            del target.cc_states[cc_type]
+            cc_title = cc_type.replace("_", " ").title()
+            print(f"      {_hero_tag(caster)}'s passive dispelled {cc_title} from {_hero_tag(target)}!")
+            
+            # trigger heal
+            heal_mult = effect.params.get("heal_mult", 1.0)
+            heal_amt = caster.compute_final_atk() * heal_mult
+            apply_heal(target, heal_amt, caster)
+            
+            # mark as triggered
+            caster.stacks["angela_passive_triggered"] = triggered_round
+            
+            # update context so _handle_apply_cc knows it got blocked/dispelled
+            context["dispelled"] = True
 
 register_effect_handler("damage", _handle_damage)
 register_effect_handler("apply_cc", _handle_apply_cc)
 register_effect_handler("override_basic", _handle_override_basic)
 register_effect_handler("modify_heal", _handle_modify_heal)
 register_effect_handler("modify_stat", _handle_modify_stat)
+register_effect_handler("apply_cc_immunity", _handle_apply_cc_immunity)
+register_effect_handler("angela_dispel", _handle_angela_dispel)
 
 
 # ====================== CORE COMBAT FUNCTIONS ======================
@@ -314,25 +380,27 @@ def execute_skill(caster: Hero, skill: Skill, overcharge_bonus: float = 0.0):
     if overcharge_bonus > 0:
         print(f"      Overcharge bonus active: {overcharge_bonus*100:.0f}%.")
     for effect in skill.effects:
-        targets = get_targets_for_effect(effect, caster)   # you can expand this
         context = {
             "current_round": global_round,
             "overcharge": overcharge_bonus,
             "damage_source": "skill",
             "skill_name": skill.name,
         }
+        targets = get_targets_for_effect(effect, caster, context)
         _log_effect(caster, effect, targets)
         if effect.type in effect_handlers:
             effect_handlers[effect.type](effect, caster, targets, context)
     caster.event_system.emit("after_skill", caster=caster)
 
-def trigger_passives(hero: Hero, event_name: str, **context):
-    if not hero.flags["passives_enabled"]:
+def trigger_passives(hero: Hero, event_name: str, context: Dict = None):
+    if context is None:
+        context = {}
+    if not hero.flags.get("passives_enabled", True):
         return
     for passive in hero.passives:
         if passive.trigger_event == event_name:
             for effect in passive.effects:
-                targets = get_targets_for_effect(effect, hero)
+                targets = get_targets_for_effect(effect, hero, context)
                 if effect.type in effect_handlers:
                     effect_handlers[effect.type](effect, hero, targets, context)
 
@@ -352,10 +420,19 @@ def pick_target(caster: Hero):
     enemies = get_enemies(caster)
     return min(enemies, key=lambda h: h.hp) if enemies else None
 
-def get_targets_for_effect(effect: Effect, caster: Hero) -> List[Hero]:
+def get_targets_for_effect(effect: Effect, caster: Hero, context: Dict = None) -> List[Hero]:
+    # Event target fallback
+    if context and effect.params.get("use_event_target"):
+        return [context.get("target")] if context.get("target") else []
     # Expand this for "all_enemies", "self", "random", etc.
     if effect.params.get("target_all_enemies"):
         return get_enemies(caster)
+    if effect.params.get("target_2_random_allies"):
+        allies = [h for h in caster.team.heroes if h.is_alive and h != caster]
+        # If not enough non-caster allies, we can include the caster, but usually it meant other allies
+        if len(allies) < 2:
+            allies = [h for h in caster.team.heroes if h.is_alive]
+        return random.sample(allies, min(2, len(allies)))
     return [caster] if effect.params.get("target_self") else [pick_target(caster)] or []
 
 global_round = 0
@@ -405,7 +482,7 @@ def build_default_teams() -> tuple[Team, Team]:
     team2.opposite = team1
     # Apply on_create passives after teams are set
     for hero in team1.heroes + team2.heroes:
-        trigger_passives(hero, "on_create", current_round=0)
+        trigger_passives(hero, "on_create", {"current_round": 0})
     return team1, team2
 
 def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
@@ -444,7 +521,7 @@ def simulate_fight(team1: Team, team2: Team, max_rounds: int = 50):
         # Trigger turn_start passives
         for hero in all_heroes:
             if hero.is_alive:
-                trigger_passives(hero, "turn_start", current_round=global_round)
+                trigger_passives(hero, "turn_start", {"current_round": global_round})
         print("")
 
     print("\n=== FIGHT END ===")
