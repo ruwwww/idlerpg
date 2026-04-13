@@ -56,7 +56,7 @@
           "cc_type": "taunt",
           "duration": 2,
           "damage_reduction_pct": 50,
-          "target_all_enemies": true
+          "target_2_random_enemies": true
         }
       ]
     },
@@ -130,7 +130,7 @@
           "cc_type": "taunt",
           "duration": 1,
           "damage_reduction_pct": 30,
-          "target_all_enemies": true
+          "target_1_random_enemy": true
         }
       ]
     },
