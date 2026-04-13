@@ -1,0 +1,24 @@
+{
+  "skills": {
+    "crashing_tide": {
+      "name": "Crashing Tide",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.3,
+          "target_all_enemies": true
+        },
+        {
+          "type": "damage",
+          "mult": 0.8,
+          "target_all_enemies": true
+        },
+        {
+          "type": "apply_cc",
+          "cc_type": "freeze",
+          "duration": 1
+        }
+      ]
+    }
+  }
+}

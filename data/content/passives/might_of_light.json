@@ -1,0 +1,14 @@
+{
+  "passives": {
+    "might_of_light": {
+      "name": "Might of Light",
+      "trigger_event": "after_skill",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 0.5
+        }
+      ]
+    }
+  }
+}

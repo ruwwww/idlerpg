@@ -7,7 +7,7 @@ from hero_factory import HeroRuntimeFactory
 
 
 def build_default_teams() -> tuple[Team, Team]:
-    content_path = Path(__file__).parent / "data" / "game_content.json"
+    content_path = Path(__file__).parent / "data" / "content"
     source = JsonHeroContentSource(str(content_path))
 
     probe_engine = BattleEngine(Team([], 1), Team([], 2))

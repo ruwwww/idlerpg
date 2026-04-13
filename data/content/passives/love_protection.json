@@ -1,0 +1,16 @@
+{
+  "passives": {
+    "love_protection": {
+      "name": "Love Protection",
+      "trigger_event": "on_ally_receive_cc",
+      "effects": [
+        {
+          "type": "angela_dispel",
+          "chance": 0.3,
+          "heal_mult": 1.5,
+          "use_event_target": true
+        }
+      ]
+    }
+  }
+}

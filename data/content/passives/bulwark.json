@@ -1,0 +1,15 @@
+{
+  "passives": {
+    "bulwark": {
+      "name": "Bulwark",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "max_hp",
+          "mult": 1.1
+        }
+      ]
+    }
+  }
+}

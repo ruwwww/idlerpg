@@ -1,0 +1,37 @@
+{
+  "passives": {
+    "selena_basic_protocol": {
+      "name": "Abyssal Basic Protocol",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "remove_status",
+          "status": "cc_immunity",
+          "target": {
+            "selector": "marked_plus_random_enemy",
+            "status": "abyssal_eyes"
+          }
+        },
+        {
+          "type": "add_stack",
+          "stack": "abyssal_countdown",
+          "amount": -1,
+          "target": {
+            "selector": "marked_target",
+            "status": "abyssal_eyes"
+          }
+        },
+        {
+          "type": "apply_status",
+          "status": "selena_guard",
+          "duration": 1,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "damage_reduction": 0.05
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "heroes": {
+    "mareia": {
+      "name": "Mareia",
+      "speed": 1250,
+      "atk": 52000,
+      "hp": 280000,
+      "defense": 8500,
+      "active_skill": "crashing_tide",
+      "passives": ["freeze_on_hit"]
+    },
+    "tara": {
+      "name": "Tara",
+      "speed": 1180,
+      "atk": 48000,
+      "hp": 320000,
+      "defense": 12000,
+      "active_skill": "seal_of_light",
+      "passives": ["might_of_light"]
+    },
+    "basic_tank": {
+      "name": "Basic Tank",
+      "speed": 900,
+      "atk": 40000,
+      "hp": 400000,
+      "defense": 15000,
+      "passives": []
+    },
+    "inverter": {
+      "name": "Inverter",
+      "speed": 1100,
+      "atk": 30000,
+      "hp": 250000,
+      "defense": 6000,
+      "active_skill": "inverted_blessing",
+      "passives": ["twisted_basic"]
+    },
+    "dps": {
+      "name": "DPS",
+      "speed": 1300,
+      "atk": 65000,
+      "hp": 180000,
+      "defense": 5000,
+      "passives": []
+    },
+    "fredrin": {
+      "name": "Fredrin",
+      "speed": 800,
+      "atk": 35000,
+      "hp": 500000,
+      "defense": 20000,
+      "active_skill": "taunt_roar",
+      "passives": ["taunt_aura", "bulwark"]
+    },
+    "enemy1": {
+      "name": "Enemy1",
+      "speed": 950,
+      "atk": 45000,
+      "hp": 300000,
+      "defense": 9000,
+      "passives": []
+    },
+    "enemy2": {
+      "name": "Enemy2",
+      "speed": 1100,
+      "atk": 55000,
+      "hp": 250000,
+      "defense": 7000,
+      "passives": []
+    },
+    "enemy3": {
+      "name": "Enemy3",
+      "speed": 1000,
+      "atk": 48000,
+      "hp": 280000,
+      "defense": 8000,
+      "passives": []
+    },
+    "enemy4": {
+      "name": "Enemy4",
+      "speed": 1200,
+      "atk": 52000,
+      "hp": 220000,
+      "defense": 6000,
+      "passives": []
+    },
+    "enemy5": {
+      "name": "Enemy5",
+      "speed": 1050,
+      "atk": 50000,
+      "hp": 260000,
+      "defense": 7500,
+      "passives": []
+    },
+    "angela": {
+      "name": "Angela",
+      "speed": 1350,
+      "atk": 42000,
+      "hp": 250000,
+      "defense": 9000,
+      "active_skill": "love_waves",
+      "passives": ["love_protection"]
+    },
+    "argus": {
+      "name": "Argus",
+      "speed": 1150,
+      "atk": 60000,
+      "hp": 200000,
+      "defense": 10000,
+      "active_skill": "demonic_grip",
+      "passives": ["argus_slash", "shield_resonance"]
+    },
+    "galatea": {
+      "name": "Galatea",
+      "speed": 1050,
+      "atk": 50000,
+      "hp": 150000,
+      "defense": 4000,
+      "active_skill": "galatea_dance",
+      "passives": ["galatea_assassin"]
+    },
+    "selena": {
+      "name": "Selena",
+      "speed": 1280,
+      "atk": 54000,
+      "hp": 210000,
+      "defense": 7000,
+      "role": "mage",
+      "type": "cc",
+      "active_skill": "selena_abyssal_bloom",
+      "passives": ["selena_abyssal_eyes", "selena_basic_protocol"]
+    }
+  }
+}

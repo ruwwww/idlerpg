@@ -1,0 +1,16 @@
+{
+  "passives": {
+    "galatea_assassin": {
+      "name": "Assassin Instincts",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "crit_chance",
+          "add": 0.3,
+          "target_self": true
+        }
+      ]
+    }
+  }
+}

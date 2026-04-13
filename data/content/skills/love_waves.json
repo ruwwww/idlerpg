@@ -1,0 +1,20 @@
+{
+  "skills": {
+    "love_waves": {
+      "name": "Love Waves",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.2,
+          "target_all_enemies": true
+        },
+        {
+          "type": "apply_cc_immunity",
+          "duration": 2,
+          "heal_mult": 1.5,
+          "target_2_random_allies": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "skills": {
+    "seal_of_light": {
+      "name": "Seal of Light",
+      "effects": [
+        {
+          "type": "apply_cc",
+          "cc_type": "seal_of_light",
+          "duration": 3
+        },
+        {
+          "type": "damage",
+          "mult": 1.2,
+          "target_all_enemies": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "skills": {
+    "galatea_dance": {
+      "name": "Death Barrage",
+      "effects": [
+        {
+          "type": "sequence",
+          "effects": [
+            {
+              "type": "repeat",
+              "times": 4,
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.8,
+                  "target": "lowest_hp_enemy"
+                }
+              ]
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "hp_pct_below",
+                "target": "lowest_hp_enemy",
+                "value": 0.3
+              },
+              "then": [
+                {
+                  "type": "repeat",
+                  "times": 2,
+                  "effects": [
+                    {
+                      "type": "damage",
+                      "mult": 0.8,
+                      "target": "lowest_hp_enemy"
+                    }
+                  ]
+                },
+                {
+                  "type": "apply_status",
+                  "status": "speed_surge",
+                  "duration": 2,
+                  "target": "self",
+                  "tags": ["buff"],
+                  "data": {
+                    "speed_delta": 500
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

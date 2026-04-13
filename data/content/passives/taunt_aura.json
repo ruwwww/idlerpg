@@ -1,0 +1,17 @@
+{
+  "passives": {
+    "taunt_aura": {
+      "name": "Taunt Aura",
+      "trigger_event": "turn_start",
+      "effects": [
+        {
+          "type": "apply_cc",
+          "cc_type": "taunt",
+          "duration": 1,
+          "damage_reduction_pct": 30,
+          "target_1_random_enemy": true
+        }
+      ]
+    }
+  }
+}

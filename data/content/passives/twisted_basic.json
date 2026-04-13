@@ -1,0 +1,15 @@
+{
+  "passives": {
+    "twisted_basic": {
+      "name": "Twisted Basic",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "override_basic",
+          "target_allies": true,
+          "convert_to_damage": true
+        }
+      ]
+    }
+  }
+}

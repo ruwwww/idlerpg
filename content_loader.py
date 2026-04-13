@@ -57,9 +57,10 @@ class HeroContentSource(Protocol):
 
 
 class JsonHeroContentSource:
-    def __init__(self, file_path: str):
-        self.file_path = Path(file_path)
-        self._raw: Dict[str, Any] = self._read_json()
+    def __init__(self, source_path: str):
+        self.source_path = Path(source_path)
+        self._raw: Dict[str, Any] = self._read_source()
+        self._validate_schema()
 
         self._skills: Dict[str, SkillDef] = {
             skill_id: self._parse_skill(skill_id, data)
@@ -80,9 +81,82 @@ class JsonHeroContentSource:
 
         self.validate_references()
 
-    def _read_json(self) -> Dict[str, Any]:
-        with self.file_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+    def _read_source(self) -> Dict[str, Any]:
+        if self.source_path.is_file():
+            with self.source_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+
+        if not self.source_path.is_dir():
+            raise ValueError(f"Content source path does not exist: {self.source_path}")
+
+        merged: Dict[str, Any] = {
+            "skills": {},
+            "passives": {},
+            "heroes": {},
+            "teams": {},
+        }
+
+        files = sorted(self.source_path.rglob("*.json"))
+        if not files:
+            raise ValueError(f"No JSON files found in content directory: {self.source_path}")
+
+        for file_path in files:
+            with file_path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+
+            if not isinstance(raw, dict):
+                raise ValueError(f"Top-level JSON must be an object in {file_path}")
+
+            for section in ["skills", "passives", "heroes", "teams"]:
+                section_data = raw.get(section)
+                if section_data is None:
+                    continue
+                if not isinstance(section_data, dict):
+                    raise ValueError(f"Section '{section}' must be an object in {file_path}")
+
+                for item_id, item_value in section_data.items():
+                    if item_id in merged[section]:
+                        raise ValueError(
+                            f"Duplicate id '{item_id}' found in section '{section}' while loading {file_path}"
+                        )
+                    merged[section][item_id] = item_value
+
+        return merged
+
+    def _validate_schema(self) -> None:
+        for skill_id, skill_data in self._raw.get("skills", {}).items():
+            if not isinstance(skill_data, dict):
+                raise ValueError(f"Skill '{skill_id}' must be an object")
+            if "name" not in skill_data or not isinstance(skill_data["name"], str):
+                raise ValueError(f"Skill '{skill_id}' is missing string field 'name'")
+            effects = skill_data.get("effects", [])
+            if not isinstance(effects, list):
+                raise ValueError(f"Skill '{skill_id}' field 'effects' must be a list")
+
+        for passive_id, passive_data in self._raw.get("passives", {}).items():
+            if not isinstance(passive_data, dict):
+                raise ValueError(f"Passive '{passive_id}' must be an object")
+            if "name" not in passive_data or not isinstance(passive_data["name"], str):
+                raise ValueError(f"Passive '{passive_id}' is missing string field 'name'")
+            if "trigger_event" not in passive_data or not isinstance(passive_data["trigger_event"], str):
+                raise ValueError(f"Passive '{passive_id}' is missing string field 'trigger_event'")
+            effects = passive_data.get("effects", [])
+            if not isinstance(effects, list):
+                raise ValueError(f"Passive '{passive_id}' field 'effects' must be a list")
+
+        for hero_id, hero_data in self._raw.get("heroes", {}).items():
+            if not isinstance(hero_data, dict):
+                raise ValueError(f"Hero '{hero_id}' must be an object")
+            required_fields = ["name", "speed", "atk", "hp", "defense"]
+            for field in required_fields:
+                if field not in hero_data:
+                    raise ValueError(f"Hero '{hero_id}' is missing required field '{field}'")
+
+        for team_id, hero_ids in self._raw.get("teams", {}).items():
+            if not isinstance(hero_ids, list):
+                raise ValueError(f"Team '{team_id}' must be a list of hero ids")
+            if not all(isinstance(hero_id, str) for hero_id in hero_ids):
+                raise ValueError(f"Team '{team_id}' must contain only string hero ids")
 
     def _parse_effect(self, effect_data: Dict[str, Any]) -> EffectDef:
         if "type" not in effect_data:

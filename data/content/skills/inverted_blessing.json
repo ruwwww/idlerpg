@@ -1,0 +1,17 @@
+{
+  "skills": {
+    "inverted_blessing": {
+      "name": "Inverted Blessing",
+      "effects": [
+        {
+          "type": "modify_heal"
+        },
+        {
+          "type": "damage",
+          "mult": 0.9,
+          "target_all_enemies": true
+        }
+      ]
+    }
+  }
+}

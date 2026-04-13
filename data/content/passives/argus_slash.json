@@ -1,0 +1,18 @@
+{
+  "passives": {
+    "argus_slash": {
+      "name": "Argus Slash",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "override_basic",
+          "persistent": true,
+          "is_damage": true,
+          "mult": 1.0,
+          "target_2_random_enemies": true,
+          "shield_steal_pct": 0.2
+        }
+      ]
+    }
+  }
+}

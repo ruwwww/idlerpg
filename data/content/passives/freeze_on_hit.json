@@ -1,0 +1,15 @@
+{
+  "passives": {
+    "freeze_on_hit": {
+      "name": "Freeze on Hit",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "apply_cc",
+          "cc_type": "freeze",
+          "duration": 1
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "teams": {
+    "team1_default": ["fredrin", "tara", "galatea", "selena"],
+    "team2_default": ["enemy1", "enemy2"]
+  }
+}

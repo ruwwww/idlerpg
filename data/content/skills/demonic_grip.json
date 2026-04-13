@@ -1,0 +1,15 @@
+{
+  "skills": {
+    "demonic_grip": {
+      "name": "Demonic Grip",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.5,
+          "target_3_random_enemies": true,
+          "shield_steal_pct": 0.5
+        }
+      ]
+    }
+  }
+}

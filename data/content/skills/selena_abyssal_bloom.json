@@ -1,0 +1,109 @@
+{
+  "skills": {
+    "selena_abyssal_bloom": {
+      "name": "Abyssal Bloom",
+      "effects": [
+        {
+          "type": "sequence",
+          "effects": [
+            {
+              "type": "damage",
+              "mult": 1.2,
+              "target": {
+                "selector": "marked_and_top_atk_others",
+                "status": "abyssal_eyes",
+                "n": 2
+              }
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "random_chance",
+                "chance": 0.3
+              },
+              "then": [
+                {
+                  "type": "apply_status",
+                  "status": "stun",
+                  "duration": 2,
+                  "target": {
+                    "selector": "marked_and_top_atk_others",
+                    "status": "abyssal_eyes",
+                    "n": 2
+                  },
+                  "tags": ["cc"]
+                }
+              ]
+            },
+            {
+              "type": "add_stack",
+              "stack": "abyssal_countdown",
+              "amount": -2,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              }
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "stack_lte",
+                "target": {
+                  "selector": "marked_target",
+                  "status": "abyssal_eyes"
+                },
+                "stack": "abyssal_countdown",
+                "value": 2
+              },
+              "then": [
+                {
+                  "type": "apply_status",
+                  "status": "stun",
+                  "duration": 4,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  },
+                  "tags": ["cc"]
+                },
+                {
+                  "type": "apply_status",
+                  "status": "abyssal_punishment",
+                  "duration": 3,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  },
+                  "tags": ["debuff"],
+                  "data": {
+                    "damage_taken_up": 0.15
+                  }
+                },
+                {
+                  "type": "heal_max_hp_pct",
+                  "pct": 0.5,
+                  "target": "self"
+                },
+                {
+                  "type": "set_stack",
+                  "stack": "abyssal_countdown",
+                  "value": 6,
+                  "target": {
+                    "selector": "marked_target",
+                    "status": "abyssal_eyes"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "modify_stat",
+              "stat_type": "energy",
+              "add": 20,
+              "target": "self"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
