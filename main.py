@@ -32,18 +32,21 @@ from hero_factory import HeroRuntimeFactory
 
 
 def _hero_tag(hero: "Hero") -> str:
-    return f"[{hero.name}]"
+    color = "\033[92m" if getattr(hero.team, "number", 1) == 1 else "\033[91m"
+    reset = "\033[0m"
+    return f"{color}[{hero.name}]{reset}"
 
 
 def _fmt_target_list(targets: List["Hero"]) -> str:
     clean = [t for t in targets if t is not None]
     if not clean:
         return "no one"
-    if len(clean) == 1:
-        return clean[0].name
-    if len(clean) == 2:
-        return f"{clean[0].name} and {clean[1].name}"
-    return ", ".join(t.name for t in clean[:-1]) + f", and {clean[-1].name}"
+    tags = [_hero_tag(t) for t in clean]
+    if len(tags) == 1:
+        return tags[0]
+    if len(tags) == 2:
+        return f"{tags[0]} and {tags[1]}"
+    return ", ".join(tags[:-1]) + f", and {tags[-1]}"
 
 
 def _log_action(caster: "Hero", action: str, targets: List["Hero"], detail: str = ""):
