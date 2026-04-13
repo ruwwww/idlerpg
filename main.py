@@ -56,7 +56,7 @@ def _log_action(caster: "Hero", action: str, targets: List["Hero"], detail: str 
     elif action == "BASIC":
         msg = f"    {_hero_tag(caster)} ({caster.hp:.0f}) attacked {target_text}."
     elif action == "BASIC_OVERRIDE":
-        msg = f"    {_hero_tag(caster)} triggered a modified basic attack on {target_text} ({detail})."
+        msg = f"    {_hero_tag(caster)} triggered a modified basic attack on {target_text}."
     else:
         msg = f"    {_hero_tag(caster)} acts on {target_text}."
     print(msg)
@@ -75,9 +75,9 @@ def _log_effect(caster: "Hero", effect: "Effect", targets: List["Hero"]):
         print(f"      {_hero_tag(caster)} altered healing behavior for this battle.")
     elif effect.type == "override_basic":
         print(f"      {_hero_tag(caster)} changed the next basic attack behavior.")
-    else:
-        params = ", ".join(f"{k}={v}" for k, v in effect.params.items()) or "no-params"
-        print(f"      {_hero_tag(caster)} triggered {effect.type} on {target_text} ({params}).")
+    # We can omit printing generic event types so we don't spam unformatted params
+    elif effect.type not in ["apply_cc_immunity", "angela_dispel", "apply_shield_resonance"]: 
+        print(f"      {_hero_tag(caster)} triggered {effect.type} on {target_text}.")
 
 # ====================== EVENT SYSTEM ======================
 class EventSystem:
