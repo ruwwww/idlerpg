@@ -16,7 +16,7 @@
           },
           "hooks": {
             "on_turn_end": [
-              { "type": "heal_max_hp_pct", "pct": 0.1, "target": "self" },
+              { "type": "heal_max_hp_pct", "pct": 0.15, "target": "self" },
               { "type": "dispel_random_debuff", "target": "self" },
               {
                 "type": "add_stack",
