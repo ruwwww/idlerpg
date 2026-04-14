@@ -10,24 +10,19 @@
           "duration": 999,
           "target": "self",
           "hooks": {
-            "on_receive_damage": [
+            "on_target_action_end": [
               {
                 "type": "conditional",
                 "condition": {
                   "type": "all",
                   "conditions": [
-                    { "type": "is_event_target", "target": "self" },
-                    {
-                      "type": "event_metadata_not_match",
-                      "key": "damage_type",
-                      "value": "dot"
-                    }
+                    { "type": "is_event_target", "target": "self" }
                   ]
                 },
                 "then": [
                   {
                     "type": "add_shield",
-                    "mult": 1.5,
+                    "mult": 0.5,
                     "target": "self"
                   },
                   {

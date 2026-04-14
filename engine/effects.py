@@ -126,15 +126,19 @@ class EffectExecutor:
         if dtu > 0:
             amount *= 1.0 + dtu
 
+        original_amount = amount
+
         if amount > 0 and target.shield > 0:
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
+            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}.")
             print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
+        elif amount > 0:
+            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
 
         if amount > 0:
             target.hp -= amount
-            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
             print(f"    {hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
             if target.hp <= 0:
                 target.is_alive = False
@@ -174,6 +178,7 @@ class EffectExecutor:
                 self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"))
                 ctx.damage_dealt += dmg
                 if not effect.params.get("no_counter", False):
+                    self.battle.action_damaged_targets.append(target)
                     self.battle.emit_event(
                         "on_receive_damage",
                         ctx.caster,

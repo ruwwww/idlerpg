@@ -19,6 +19,7 @@ class BattleEngine:
         self.all_heroes: List[Hero] = self.team1.heroes + self.team2.heroes
         self.round = 0
         self.listeners: List[Dict[str, Any]] = []
+        self.action_damaged_targets: List[Hero] = []
 
         self.target_resolver = TargetResolver()
         self.executor = EffectExecutor(self)
@@ -117,7 +118,8 @@ class BattleEngine:
 
         for hero in trigger_pool:
             if hero.is_alive:
-                self._trigger_status_hooks(f"on_{event_name}", hero, metadata)
+                hook_name = event_name if event_name.startswith("on_") else f"on_{event_name}"
+                self._trigger_status_hooks(hook_name, hero, metadata)
 
     def execute_basic(self, caster: Hero):
         override = caster.behavior.get("basic_override")
@@ -215,10 +217,24 @@ class BattleEngine:
                     print(f"    {hero_tag(hero)} is disabled and cannot act.")
                     continue
 
+                self.action_damaged_targets.clear()
+
                 if hero.energy >= 100:
                     self.execute_skill(hero)
                 else:
                     self.execute_basic(hero)
+
+                for target in list(dict.fromkeys(self.action_damaged_targets)):
+                    if target.is_alive:
+                        self.emit_event(
+                            "on_target_action_end",
+                            hero,
+                            [target],
+                            {
+                                "event_source": hero,
+                                "event_target": target,
+                            }
+                        )
 
                 self.emit_event("after_action", hero, [hero], {})
 
