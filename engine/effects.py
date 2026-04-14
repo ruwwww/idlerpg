@@ -169,11 +169,63 @@ class EffectExecutor:
         out_mult = caster.get_status_modifier("shielding_done_mult") + caster.get_status_modifier("shield_effect_mult")
         return amount * max(0.0, 1.0 + out_mult)
 
-    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None) -> float:
+    # Maximum armor damage reduction (75% — soft cap matching Idle Heroes floor).
+    ARMOR_DR_CAP = 0.75
+
+    def _apply_damage(
+        self,
+        target: Hero,
+        amount: float,
+        caster: Hero,
+        is_crit: bool,
+        damage_type: str = "physical",
+        source_skill: Optional[str] = None,
+        armor_break_pct: float = 0.0,
+        ignore_armor: bool = False,
+    ) -> float:
         amount = max(0.0, amount)
         shield_dealt = 0.0
         hp_dealt = 0.0
 
+        # ── ARMOR DR ────────────────────────────────────────────────────────────
+        # Applied to physical hits only. Holy / dot / true / ignore_armor bypass.
+        _armor_bypass = ignore_armor or damage_type in ("dot", "true", "holy")
+        if not _armor_bypass and amount > 0:
+            # Armor break from: effect param + caster's penetration buffs + debuff on target
+            total_armor_break = min(
+                100.0,
+                armor_break_pct
+                + caster.get_status_modifier("armor_break_add")
+                + target.get_status_modifier("armor_break_add"),
+            )
+            effective_armor = target.compute_final_defense() * (1.0 - total_armor_break / 100.0)
+            # Denominator = base_constant + level * 25.
+            # base_constant=30000 is calibrated to this engine's stat scale
+            # (hero defense values 5k–20k → DPS ~17%, Tank ~58% at level 160).
+            armor_dr = effective_armor / max(1.0, 30000.0 + target.level * 25.0)
+            armor_dr = min(self.ARMOR_DR_CAP, armor_dr)
+            if armor_dr > 0:
+                amount *= 1.0 - armor_dr
+
+        # ── BLOCK CHECK ─────────────────────────────────────────────────────────
+        # Holy / dot / true damage and ignore_armor all bypass block.
+        _is_blocked = False
+        if not _armor_bypass and amount > 0:
+            precision = caster.compute_final_precision()
+            block = target.compute_final_block()
+            effective_block_pct = max(0.0, block - precision)
+            if effective_block_pct > 0 and random.random() < effective_block_pct / 100.0:
+                amount *= 0.67  # 33% damage reduction on block
+                _is_blocked = True
+                print(f"    BLOCK! {hero_tag(target)} blocked {hero_tag(caster)}'s attack (-33% damage).")
+                self.battle.emit_event(
+                    "on_block",
+                    caster,
+                    [target],
+                    {"event_source": caster, "event_target": target},
+                )
+
+        # ── EXISTING STATUS-BASED REDUCTIONS ────────────────────────────────────
         taunt_dr = 0.0
         taunted_attacker = False
         for status in caster.statuses:
@@ -252,12 +304,16 @@ class EffectExecutor:
             caster.combat_stats["damage_dealt_shield"] += absorbed
             if damage_type == "dot":
                 print(f"    {hero_tag(target)} took {original_amount:.0f} DoT damage from {source_str}.")
+            elif damage_type == "holy":
+                print(f"    {hero_tag(caster)} dealt {original_amount:.0f} Holy damage to {hero_tag(target)} (ignores armor).")
             else:
                 print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}.")
             print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
         elif amount > 0:
             if damage_type == "dot":
                 print(f"    {hero_tag(target)} took {amount:.0f} DoT damage from {source_str}.")
+            elif damage_type == "holy":
+                print(f"    {hero_tag(caster)} dealt {amount:.0f} Holy damage to {hero_tag(target)} (ignores armor).")
             else:
                 print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
 
@@ -275,6 +331,7 @@ class EffectExecutor:
 
         target.energy = min(999, target.energy + (20 if is_crit else 10))
         return shield_dealt + hp_dealt
+
 
     def _register_default_handlers(self):
         def h_damage(effect: Effect, ctx: EffectContext):
@@ -321,6 +378,18 @@ class EffectExecutor:
                             crit_mult *= max(0.0, 1.0 - crit_reduction)
                         dmg *= crit_mult
 
+                # ── ARMOR BREAK ────────────────────────────────────────────────
+                armor_break = float(effect.params.get("armor_break_pct", 0.0))
+
+                # ── HOLY DAMAGE ────────────────────────────────────────────────
+                # holy_pct can come from the effect itself or a caster buff/status.
+                holy_pct = float(effect.params.get("holy_pct", 0.0))
+                holy_pct += ctx.caster.get_status_modifier("holy_damage_add")
+                holy_dmg = 0.0
+                if holy_pct > 0:
+                    # Holy scales from base ATK only (no crit, no armor, no block).
+                    holy_dmg = ctx.caster.compute_final_atk() * (holy_pct / 100.0)
+
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
                 if (
                     ctx.metadata.get("taunt_forced")
@@ -329,7 +398,25 @@ class EffectExecutor:
                 ):
                     print(f"    {hero_tag(ctx.caster)} is taunted and is forced to target {hero_tag(target)}.")
                     ctx.metadata["taunt_forced_logged"] = True
-                dealt_actual = self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)
+
+                # Normal hit (with Armor DR + Block).
+                dealt_actual = self._apply_damage(
+                    target, dmg, ctx.caster, is_crit,
+                    damage_type=effect.params.get("damage_type", "physical"),
+                    source_skill=source_skill,
+                    armor_break_pct=armor_break,
+                )
+
+                # Holy hit (ignores armor, ignores block, no crit).
+                if holy_dmg > 0 and target.is_alive:
+                    holy_actual = self._apply_damage(
+                        target, holy_dmg, ctx.caster, False,
+                        damage_type="holy",
+                        source_skill=source_skill,
+                        ignore_armor=True,
+                    )
+                    dealt_actual += holy_actual
+
                 ctx.damage_dealt += dmg
                 ctx.damage_dealt_actual += dealt_actual
                 ctx.metadata["action_damage_dealt_raw"] = float(ctx.metadata.get("action_damage_dealt_raw", 0.0)) + dmg
@@ -1033,3 +1120,85 @@ class EffectExecutor:
         self.register("override_basic", h_override_basic)
         self.register("angela_dispel", h_angela_dispel)
         self.register("apply_shield_resonance", h_apply_shield_resonance)
+
+        # ── NEW MECHANICS: Armor Break / Precision / Block / Holy ────────────────
+
+        def h_armor_break(effect: Effect, ctx: EffectContext):
+            """Apply an Armor Break debuff to target(s), reducing their effective armor."""
+            pct = float(effect.params.get("pct", 0.0))
+            duration = int(effect.params.get("duration", 2))
+            mapped = Effect(
+                "apply_status",
+                status="armor_break",
+                duration=duration,
+                tags=["debuff"],
+                data={"modifiers": {"armor_break_add": pct}},
+                target=effect.params.get("target", "lowest_hp_enemy"),
+            )
+            h_apply_status(mapped, ctx)
+
+        def h_holy_damage(effect: Effect, ctx: EffectContext):
+            """
+            Standalone holy damage hit — ignores armor and block.
+            Use as a nested sub-effect or passive trigger for on-hit holy procs.
+            """
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.0))
+            mult = float(effect.params.get("mult", 0.0))
+            source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                # Accept either pct (% of ATK) or mult (raw multiplier, same units)
+                amount = ctx.caster.compute_final_atk() * (pct / 100.0 if pct else mult)
+                if amount <= 0:
+                    continue
+                dealt_actual = self._apply_damage(
+                    target, amount, ctx.caster, False,
+                    damage_type="holy",
+                    source_skill=source_skill,
+                    ignore_armor=True,
+                )
+                ctx.damage_dealt += amount
+                ctx.damage_dealt_actual += dealt_actual
+                if not effect.params.get("no_counter", False):
+                    self.battle.action_damaged_targets.append(target)
+                    self.battle.emit_event(
+                        "on_receive_damage",
+                        ctx.caster,
+                        [target],
+                        {
+                            "target": target,
+                            "damage": amount,
+                            "damage_type": "holy",
+                            "event_source": ctx.caster,
+                            "event_target": target,
+                        },
+                    )
+
+        def h_add_combat_stat(effect: Effect, ctx: EffectContext):
+            """
+            Generic combat stat buff/debuff via apply_status + data.modifiers.
+            Supported stat keys (read by get_status_modifier):
+              precision_add, block_add, holy_damage_add, armor_break_add,
+              defense_add, defense_mult, atk_mult, etc.
+            """
+            stat = effect.params.get("stat")
+            value = float(effect.params.get("value", 0.0))
+            duration = int(effect.params.get("duration", 1))
+            is_buff = value >= 0
+            mapped = Effect(
+                "apply_status",
+                status=f"stat_{stat}",
+                duration=duration,
+                tags=["buff"] if is_buff else ["debuff"],
+                data={"modifiers": {stat: value}},
+                target=effect.params.get("target", "self"),
+                chance=float(effect.params.get("chance", 1.0)),
+            )
+            h_apply_status(mapped, ctx)
+
+        self.register("armor_break", h_armor_break)
+        self.register("holy_damage", h_holy_damage)
+        self.register("add_combat_stat", h_add_combat_stat)
+

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,9 @@ class HeroDef:
     atk: float
     hp: float
     defense: float
+    level: Optional[int]    # None = not set in JSON, factory applies default
+    precision: float
+    block: float
     basic_skill_id: str | None
     active_skill_id: str | None
     passive_ids: List[str]
@@ -188,6 +191,9 @@ class JsonHeroContentSource:
             atk=float(hero_data["atk"]),
             hp=float(hero_data["hp"]),
             defense=float(hero_data["defense"]),
+            level=int(hero_data["level"]) if "level" in hero_data else None,
+            precision=float(hero_data.get("precision", 0.0)),
+            block=float(hero_data.get("block", 0.0)),
             basic_skill_id=hero_data.get("basic_attack"),
             active_skill_id=hero_data.get("active_skill"),
             passive_ids=list(hero_data.get("passives", [])),

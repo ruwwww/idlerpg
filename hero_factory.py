@@ -13,12 +13,14 @@ class HeroRuntimeFactory:
         skill_ctor: Callable,
         passive_ctor: Callable,
         effect_ctor: Callable,
+        default_level: int = 160,
     ):
         self.source = source
         self.hero_ctor = hero_ctor
         self.skill_ctor = skill_ctor
         self.passive_ctor = passive_ctor
         self.effect_ctor = effect_ctor
+        self.default_level = default_level  # used when hero JSON has no "level" field
 
     def create_hero(self, hero_id: str):
         hero_def = self.source.get_hero(hero_id)
@@ -28,7 +30,10 @@ class HeroRuntimeFactory:
             hero_def.atk,
             hero_def.hp,
             hero_def.defense,
+            hero_def.level if hero_def.level is not None else self.default_level,
         )
+        hero.precision = hero_def.precision
+        hero.block = hero_def.block
 
         if hero_def.basic_skill_id:
             basic_def = self.source.get_skill(hero_def.basic_skill_id)

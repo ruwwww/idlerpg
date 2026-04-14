@@ -101,6 +101,9 @@ class BattleEngine:
 
         if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create"]:
             trigger_pool = [caster]
+        elif event_name == "on_block":
+            # on_block passives belong to the blocking hero (targets[0] = the defender)
+            trigger_pool = [targets[0]] if targets else []
         elif event_name == "on_death":
             trigger_pool = list(self.all_heroes)
         elif event_name == "on_ally_receive_cc":

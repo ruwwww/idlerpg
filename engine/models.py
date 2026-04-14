@@ -65,7 +65,7 @@ class EffectContext:
 
 
 class Hero:
-    def __init__(self, name: str, speed: int, atk: float, hp: float, defense: float):
+    def __init__(self, name: str, speed: int, atk: float, hp: float, defense: float, level: int = 1):
         self.name = name
         self.speed = speed
         self.atk = atk
@@ -74,6 +74,9 @@ class Hero:
         self.shield = 0.0
         self.max_shield = hp
         self.defense = defense
+        self.level = level          # Used in Armor DR formula: armor / (180 + level * 25)
+        self.precision: float = 0.0  # % precision — reduces enemy effective block 1:1
+        self.block: float = 0.0      # % block chance — triggers 33% DR on proc
         self.crit_chance = 0.0
         self.crit_damage = 1.5
         self.energy = 50.0
@@ -179,6 +182,20 @@ class Hero:
         atk_bonus = sum(b.value for b in self.buffs if b.name == "atk_buff")
         status_mult = self.get_status_modifier("atk_mult")
         return self.atk * max(0.0, (1.0 + atk_bonus + status_mult))
+
+    def compute_final_defense(self) -> float:
+        """Effective armor value after status modifiers (before Armor Break)."""
+        bonus = self.get_status_modifier("defense_add")
+        mult = 1.0 + self.get_status_modifier("defense_mult")
+        return max(0.0, (self.defense + bonus) * mult)
+
+    def compute_final_precision(self) -> float:
+        """Total Precision % (reduces enemy block chance 1:1)."""
+        return max(0.0, self.precision + self.get_status_modifier("precision_add"))
+
+    def compute_final_block(self) -> float:
+        """Total Block % (chance to reduce incoming damage by 33%)."""
+        return max(0.0, self.block + self.get_status_modifier("block_add"))
 
     def compute_final_speed(self) -> int:
         speed_bonus = int(sum(b.value for b in self.buffs if b.name == "speed_buff"))
