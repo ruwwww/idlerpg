@@ -243,3 +243,21 @@ class BattleEngine:
         print("\n=== FIGHT END ===")
         print(f"Team 1 alive: {sum(1 for hero in self.team1.heroes if hero.is_alive)}")
         print(f"Team 2 alive: {sum(1 for hero in self.team2.heroes if hero.is_alive)}")
+
+        print("\n=== POST BATTLE SUMMARY ===")
+        all_heroes_sorted = sorted(self.all_heroes, key=lambda h: (h.team.number, h.name))
+        
+        current_team = None
+        for hero in all_heroes_sorted:
+            if current_team != hero.team.number:
+                current_team = hero.team.number
+                print(f"\n--- Team {current_team} ---")
+            
+            stats = hero.combat_stats
+            print(f"[{hero.name}]")
+            print(f"    Damage Dealt (HP):     {stats['damage_dealt_hp']:>8.0f}")
+            print(f"    Damage Dealt (Shield): {stats['damage_dealt_shield']:>8.0f}")
+            print(f"    Damage Taken (HP):     {stats['damage_taken_hp']:>8.0f}")
+            print(f"    Damage Taken (Shield): {stats['damage_taken_shield']:>8.0f}")
+            print(f"    Healing Done:          {stats['healing_done']:>8.0f}")
+            print(f"    Shielding Done:        {stats['shielding_done']:>8.0f}")

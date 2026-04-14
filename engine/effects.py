@@ -111,7 +111,7 @@ class EffectExecutor:
         amount = max(0.0, amount)
 
         dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
-        dr += 0.03 * target.stacks.get("shroom_potion", 0)
+        dr += 0.10 * target.stacks.get("shroom_potion", 0)
         if target.shield > 0:
             dr += sum(status.data.get("shield_damage_reduction", 0.0) for status in target.statuses)
         
@@ -132,6 +132,8 @@ class EffectExecutor:
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
+            target.combat_stats["damage_taken_shield"] += absorbed
+            caster.combat_stats["damage_dealt_shield"] += absorbed
             print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}.")
             print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
         elif amount > 0:
@@ -139,6 +141,8 @@ class EffectExecutor:
 
         if amount > 0:
             target.hp -= amount
+            target.combat_stats["damage_taken_hp"] += amount
+            caster.combat_stats["damage_dealt_hp"] += amount
             print(f"    {hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
             if target.hp <= 0:
                 target.is_alive = False
@@ -207,6 +211,7 @@ class EffectExecutor:
                     continue
                 amount = ctx.caster.compute_final_atk() * mult
                 target.hp = min(target.max_hp, target.hp + amount)
+                ctx.caster.combat_stats["healing_done"] += amount
                 print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f}.")
 
         def h_modify_stat(effect: Effect, ctx: EffectContext):
@@ -365,6 +370,7 @@ class EffectExecutor:
                     amount += ctx.caster.max_hp * max_hp_pct
                 if amount > 0:
                     target.shield = min(target.max_shield, target.shield + amount)
+                    ctx.caster.combat_stats["shielding_done"] += amount
                     print(f"    {hero_tag(target)} gained {amount:.0f} shield (Total: {target.shield:.0f}).")
 
         self.handlers["add_shield"] = h_add_shield
@@ -446,6 +452,7 @@ class EffectExecutor:
                     continue
                 amount = target.max_hp * pct
                 target.hp = min(target.max_hp, target.hp + amount)
+                ctx.caster.combat_stats["healing_done"] += amount
                 print(f"    {hero_tag(target)} recovered {amount:.0f} HP ({pct*100:.0f}% max HP).")
 
         def h_random_choice(effect: Effect, ctx: EffectContext):
@@ -491,6 +498,7 @@ class EffectExecutor:
                 if not target or not target.is_alive:
                     continue
                 target.hp = min(target.max_hp, target.hp + amount)
+                ctx.caster.combat_stats["healing_done"] += amount
                 print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f} HP ({pct*100:.0f}% of damage dealt).")
 
         self.handlers["heal_percent_damage_dealt"] = h_heal_percent_damage_dealt

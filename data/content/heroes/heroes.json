@@ -78,8 +78,8 @@
       "name": "Geester",
       "speed": 1400,
       "atk": 55000,
-      "hp": 180000,
-      "defense": 5000,
+      "hp": 195000,
+      "defense": 5500,
       "basic_attack": "geester_basic_attack",
       "active_skill": "geester_active",
       "passives": ["geester_shroom_potion", "geester_dot_master"]

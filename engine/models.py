@@ -78,6 +78,15 @@ class Hero:
         self.is_alive = True
         self.team = None
 
+        self.combat_stats: Dict[str, float] = {
+            "damage_dealt_hp": 0.0,
+            "damage_dealt_shield": 0.0,
+            "damage_taken_hp": 0.0,
+            "damage_taken_shield": 0.0,
+            "healing_done": 0.0,
+            "shielding_done": 0.0
+        }
+
         self.buffs: List[Buff] = []
         self.passives: List[Passive] = []
         self.active_skill: Optional[Skill] = None

@@ -18,6 +18,36 @@
                 "target": "self"
               }
             ],
+            "on_target_action_end": [
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "all",
+                  "conditions": [
+                    { "type": "is_event_target", "target": "self" },
+                    { "type": "hp_pct_below", "value": 0.5 },
+                    {
+                      "type": "stack_lte",
+                      "stack": "geester_second_wind",
+                      "value": 0
+                    }
+                  ]
+                },
+                "then": [
+                  {
+                    "type": "heal_max_hp_pct",
+                    "pct": 1.0,
+                    "target": "self"
+                  },
+                  {
+                    "type": "add_stack",
+                    "stack": "geester_second_wind",
+                    "amount": 1,
+                    "target": "self"
+                  }
+                ]
+              }
+            ],
             "on_active_skill_used": [
               {
                 "type": "sequence",
