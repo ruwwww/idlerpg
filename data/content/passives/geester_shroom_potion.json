@@ -67,6 +67,7 @@
                     "type": "add_stack",
                     "stack": "polymer_essence",
                     "amount": 1,
+                    "ttl_rounds": 2,
                     "target": "self"
                   },
                   {
@@ -90,7 +91,8 @@
                       {
                         "type": "add_stack",
                         "stack": "polymer_essence",
-                        "amount": 2,
+                        "amount": 1,
+                        "ttl_rounds": 2,
                         "target": "self"
                       }
                     ]

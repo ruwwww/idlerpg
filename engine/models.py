@@ -93,9 +93,53 @@ class Hero:
         self.active_skill: Optional[Skill] = None
 
         self.stacks: Dict[str, int] = defaultdict(int)
+        self.stack_ttls: Dict[str, List[int]] = defaultdict(list)
         self.statuses: List[Status] = []
         self.behavior: Dict[str, Any] = {}
         self.modifiers: Dict[str, List[Callable[[float, "Hero", "Hero"], float]]] = defaultdict(list)
+
+    def add_timed_stack(self, stack_name: str, amount: int, ttl_rounds: int) -> None:
+        if amount <= 0 or ttl_rounds <= 0:
+            return
+        for _ in range(amount):
+            self.stack_ttls[stack_name].append(int(ttl_rounds))
+        self.stacks[stack_name] += amount
+
+    def consume_timed_stack(self, stack_name: str, amount: int) -> int:
+        if amount <= 0:
+            return 0
+        timers = self.stack_ttls.get(stack_name)
+        if not timers:
+            return 0
+        timers.sort()
+        consumed = min(amount, len(timers))
+        del timers[:consumed]
+        if not timers:
+            self.stack_ttls.pop(stack_name, None)
+        return consumed
+
+    def clear_timed_stack(self, stack_name: str) -> None:
+        self.stack_ttls.pop(stack_name, None)
+
+    def tick_stack_ttls(self) -> None:
+        for stack_name in list(self.stack_ttls.keys()):
+            timers = self.stack_ttls.get(stack_name, [])
+            if not timers:
+                self.stack_ttls.pop(stack_name, None)
+                continue
+
+            expired = 0
+            for idx in range(len(timers)):
+                timers[idx] -= 1
+                if timers[idx] <= 0:
+                    expired += 1
+
+            if expired > 0:
+                timers[:] = [value for value in timers if value > 0]
+                self.stacks[stack_name] = max(0, self.stacks.get(stack_name, 0) - expired)
+
+            if not timers:
+                self.stack_ttls.pop(stack_name, None)
 
     def get_status_modifier(self, key: str) -> float:
         total = 0.0

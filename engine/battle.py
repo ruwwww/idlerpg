@@ -190,6 +190,8 @@ class BattleEngine:
                 if buff.duration <= 0:
                     hero.buffs.remove(buff)
 
+            hero.tick_stack_ttls()
+
             for key in list(hero.behavior.keys()):
                 rule = hero.behavior[key]
                 if isinstance(rule, dict) and rule.get("until_round", -1) < self.round:

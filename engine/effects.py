@@ -395,12 +395,20 @@ class EffectExecutor:
             amount = int(effect.params.get("amount", 1))
             min_value = effect.params.get("min")
             max_value = effect.params.get("max")
+            ttl_rounds = effect.params.get("ttl_rounds")
             for target in targets:
-                target.stacks[stack_name] += amount
+                if ttl_rounds is not None:
+                    target.add_timed_stack(stack_name, amount, int(ttl_rounds))
+                else:
+                    target.stacks[stack_name] += amount
                 if min_value is not None:
                     target.stacks[stack_name] = max(int(min_value), target.stacks[stack_name])
                 if max_value is not None:
                     target.stacks[stack_name] = min(int(max_value), target.stacks[stack_name])
+                    timed = target.stack_ttls.get(stack_name)
+                    if timed and len(timed) > target.stacks[stack_name]:
+                        timed.sort()
+                        del timed[target.stacks[stack_name]:]
                 print(f"    {hero_tag(target)} stack {stack_name} = {target.stacks[stack_name]}.")
 
         def h_set_stack(effect: Effect, ctx: EffectContext):
@@ -413,6 +421,7 @@ class EffectExecutor:
                 value = int(value_param)
             for target in targets:
                 target.stacks[stack_name] = max(0, value)
+                target.clear_timed_stack(stack_name)
                 print(f"    {hero_tag(target)} stack {stack_name} set to {target.stacks[stack_name]}.")
 
         def h_consume_stack(effect: Effect, ctx: EffectContext):
@@ -420,7 +429,10 @@ class EffectExecutor:
             stack_name = effect.params.get("stack")
             amount = int(effect.params.get("amount", 1))
             for target in targets:
-                target.stacks[stack_name] = max(0, target.stacks.get(stack_name, 0) - amount)
+                consumed_timed = target.consume_timed_stack(stack_name, amount)
+                remaining = max(0, amount - consumed_timed)
+                if remaining > 0:
+                    target.stacks[stack_name] = max(0, target.stacks.get(stack_name, 0) - remaining)
                 print(f"    {hero_tag(target)} consumed {amount} {stack_name} stack(s).")
 
         def h_add_shield(effect: Effect, ctx: EffectContext):

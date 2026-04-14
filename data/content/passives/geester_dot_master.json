@@ -22,6 +22,7 @@
                 "type": "add_stack",
                 "stack": "polymer_essence",
                 "amount": 1,
+                "ttl_rounds": 2,
                 "target": "self"
               }
             ]
