@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from .effects import EffectExecutor
 from .models import Effect, EffectContext, Hero, Team
@@ -20,6 +20,9 @@ class BattleEngine:
         self.round = 0
         self.listeners: List[Dict[str, Any]] = []
         self.action_damaged_targets: List[Hero] = []
+        self.pending_damage_energy: Dict[Hero, float] = {}
+        self.pending_damage_energy_sources: Dict[Hero, Hero] = {}
+        self.pending_damage_energy_targets: Set[Hero] = set()
 
         self.target_resolver = TargetResolver()
         self.executor = EffectExecutor(self)
@@ -92,6 +95,38 @@ class BattleEngine:
             if hero.name == name:
                 return hero
         return None
+
+    def queue_damage_energy_from_damage(self, event_caster: Hero, hero: Hero, gain: float = 10.0):
+        """Queue once-per-action incoming energy from taking damage.
+
+        Energy application is deferred until the current action fully resolves.
+        """
+        if not hero.is_alive:
+            return
+        if hero in self.pending_damage_energy_targets:
+            return
+        self.pending_damage_energy_targets.add(hero)
+        self.pending_damage_energy[hero] = max(0.0, float(gain))
+        self.pending_damage_energy_sources[hero] = event_caster
+
+    def flush_queued_damage_energy(self):
+        if not self.pending_damage_energy:
+            return
+
+        for hero, gain in list(self.pending_damage_energy.items()):
+            if gain <= 0 or not hero.is_alive:
+                continue
+            prev_energy = hero.energy
+            hero.energy = min(999, hero.energy + gain)
+            gained_energy = hero.energy - prev_energy
+            if gained_energy > 0:
+                print(f"    {hero_tag(hero)} gained +{gained_energy:.1f} energy from damage (now {hero.energy:.1f}).")
+            source = self.pending_damage_energy_sources.get(hero, hero)
+            self._emit_energy_full_if_crossed(source, hero, prev_energy, attempted_gain=gain)
+
+        self.pending_damage_energy.clear()
+        self.pending_damage_energy_sources.clear()
+        self.pending_damage_energy_targets.clear()
 
     def _emit_energy_full_if_crossed(
         self,
@@ -334,6 +369,7 @@ class BattleEngine:
                         )
 
                 self.emit_event("after_action", hero, [hero], {})
+                self.flush_queued_damage_energy()
 
             self.tick_round_end()
 

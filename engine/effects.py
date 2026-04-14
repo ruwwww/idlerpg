@@ -184,7 +184,7 @@ class EffectExecutor:
     ARMOR_DR_CAP = 0.75
 
     def _grant_damage_energy_once(self, ctx: EffectContext, target: Hero) -> None:
-        """Grant incoming damage energy once per attack context for each target."""
+        """Queue incoming damage energy once per action cycle for each target."""
         if not target.is_alive:
             return
 
@@ -192,33 +192,7 @@ class EffectExecutor:
         # basic attack (including basic override) or active skill.
         if ctx.event not in {"basic", "basic_override", "skill"}:
             return
-
-        tracker = ctx.metadata.get("_damage_energy_tracker")
-        if not isinstance(tracker, set):
-            tracker = set()
-            ctx.metadata["_damage_energy_tracker"] = tracker
-
-        scope = id(ctx.status) if ctx.status is not None else "__action__"
-        key = (target.name, scope)
-        if key in tracker:
-            return
-
-        tracker.add(key)
-        prev_energy = target.energy
-        energy_gain = 10.0
-        target.energy = min(999, target.energy + energy_gain)
-        gained_energy = target.energy - prev_energy
-        if gained_energy > 0:
-            print(
-                f"    {hero_tag(target)} gained +{gained_energy:.1f} energy from damage "
-                f"(now {target.energy:.1f})."
-            )
-        self.battle._emit_energy_full_if_crossed(
-            ctx.caster,
-            target,
-            prev_energy,
-            attempted_gain=energy_gain,
-        )
+        self.battle.queue_damage_energy_from_damage(ctx.caster, target, 10.0)
 
     def _apply_damage(
         self,

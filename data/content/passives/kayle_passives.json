@@ -86,7 +86,7 @@
                     "selector": "random_marked_enemy_priority",
                     "status": "vulnerability"
                   },
-                  "mult": 0.75,
+                  "mult": 0.6,
                   "true_damage_if_status": "vulnerability"
                 }
               ]
