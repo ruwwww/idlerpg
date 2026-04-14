@@ -264,6 +264,13 @@ class EffectExecutor:
                         dmg *= crit_mult
 
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
+                if (
+                    ctx.metadata.get("taunt_forced")
+                    and not ctx.metadata.get("taunt_forced_logged")
+                    and target.name == ctx.metadata.get("taunt_forced_target")
+                ):
+                    print(f"    {hero_tag(ctx.caster)} is taunted and is forced to target {hero_tag(target)}.")
+                    ctx.metadata["taunt_forced_logged"] = True
                 dealt_actual = self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)
                 ctx.damage_dealt += dmg
                 ctx.damage_dealt_actual += dealt_actual
