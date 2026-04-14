@@ -14,8 +14,8 @@ def build_default_teams() -> tuple[Team, Team]:
     source.validate_effect_types(set(probe_engine.executor.handlers.keys()))
 
     runtime_factory = HeroRuntimeFactory(source, Hero, Skill, Passive, Effect)
-    team1 = Team(runtime_factory.create_team_heroes("team1_default"), 1)
-    team2 = Team(runtime_factory.create_team_heroes("team1_aether_demo"), 2)
+    team1 = Team(runtime_factory.create_team_heroes("kayle_test"), 1)
+    team2 = Team(runtime_factory.create_team_heroes("brutus_test"), 2)
     team1.opposite = team2
     team2.opposite = team1
     return team1, team2

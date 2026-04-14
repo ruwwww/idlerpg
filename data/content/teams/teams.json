@@ -5,6 +5,8 @@
     "team1_mythos_demo": ["brutus"],
     "team1_rexus_demo": ["rexus", "fredrin", "selena", "geester", "mareia"],
     "team1_aether_demo": ["fredrin", "argus", "brutus", "aether", "geester"],
-    "kayle_demo": ["kayle", "fredrin", "aether", "angela", "selena"]
+    "kayle_demo": ["kayle", "fredrin", "aether", "angela", "selena"],
+    "kayle_test": ["kayle"],
+    "brutus_test": ["brutus"]
   }
 }

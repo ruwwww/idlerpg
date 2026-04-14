@@ -183,6 +183,38 @@ class EffectExecutor:
     # Maximum armor damage reduction (75% — soft cap matching Idle Heroes floor).
     ARMOR_DR_CAP = 0.75
 
+    def _grant_damage_energy_once(self, ctx: EffectContext, target: Hero) -> None:
+        """Grant incoming damage energy once per attack context for each target."""
+        if not target.is_alive:
+            return
+
+        tracker = ctx.metadata.get("_damage_energy_tracker")
+        if not isinstance(tracker, set):
+            tracker = set()
+            ctx.metadata["_damage_energy_tracker"] = tracker
+
+        scope = id(ctx.status) if ctx.status is not None else "__action__"
+        key = (target.name, scope)
+        if key in tracker:
+            return
+
+        tracker.add(key)
+        prev_energy = target.energy
+        energy_gain = 10.0
+        target.energy = min(999, target.energy + energy_gain)
+        gained_energy = target.energy - prev_energy
+        if gained_energy > 0:
+            print(
+                f"    {hero_tag(target)} gained +{gained_energy:.1f} energy from damage "
+                f"(now {target.energy:.1f})."
+            )
+        self.battle._emit_energy_full_if_crossed(
+            ctx.caster,
+            target,
+            prev_energy,
+            attempted_gain=energy_gain,
+        )
+
     def _apply_damage(
         self,
         target: Hero,
@@ -354,11 +386,6 @@ class EffectExecutor:
                 print(f"    {hero_tag(target)} has been defeated.")
                 self.battle.emit_event("on_death", caster, [target], {"dead": target, "event_source": caster, "event_target": target})
 
-        energy_gain = 20.0 if is_crit else 10.0
-        prev_energy = target.energy
-        target.energy = min(999, target.energy + energy_gain)
-        # Emit on_energy_full when target crosses the 100-energy threshold.
-        self.battle._emit_energy_full_if_crossed(caster, target, prev_energy, attempted_gain=energy_gain)
         return shield_dealt + hp_dealt
 
 
@@ -441,6 +468,8 @@ class EffectExecutor:
                     armor_break_pct=armor_break,
                     ignore_all_dr=ignore_all,
                 )
+                if dealt_actual > 0:
+                    self._grant_damage_energy_once(ctx, target)
 
                 # Holy hit (ignores armor, ignores block, no crit).
                 if holy_dmg > 0 and target.is_alive:
@@ -451,6 +480,8 @@ class EffectExecutor:
                         ignore_armor=True,
                     )
                     dealt_actual += holy_actual
+                    if holy_actual > 0:
+                        self._grant_damage_energy_once(ctx, target)
 
                 ctx.damage_dealt += dmg
                 ctx.damage_dealt_actual += dealt_actual
@@ -503,6 +534,8 @@ class EffectExecutor:
                     damage_type=effect.params.get("damage_type", "physical"),
                     source_skill=source_skill,
                 )
+                if dealt_actual > 0:
+                    self._grant_damage_energy_once(ctx, target)
                 ctx.damage_dealt += dmg
                 ctx.damage_dealt_actual += dealt_actual
                 ctx.metadata["action_damage_dealt_raw"] = float(ctx.metadata.get("action_damage_dealt_raw", 0.0)) + dmg
@@ -1204,6 +1237,8 @@ class EffectExecutor:
                     source_skill=source_skill,
                     ignore_armor=True,
                 )
+                if dealt_actual > 0:
+                    self._grant_damage_energy_once(ctx, target)
                 ctx.damage_dealt += amount
                 ctx.damage_dealt_actual += dealt_actual
                 if not effect.params.get("no_counter", False):
