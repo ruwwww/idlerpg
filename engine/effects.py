@@ -165,7 +165,21 @@ class EffectExecutor:
         shield_dealt = 0.0
         hp_dealt = 0.0
 
+        taunt_dr = 0.0
+        for status in caster.statuses:
+            if not status.data.get("force_target_source", False):
+                continue
+            if status.source_name != target.name:
+                continue
+            value = status.data.get("damage_reduction_vs_taunter")
+            if value is None:
+                value = status.data.get("taunt_damage_reduction_pct", 0.0)
+            if isinstance(value, (int, float)):
+                taunt_dr = max(taunt_dr, float(value))
+
         dr = target.get_status_modifier("damage_reduction")
+        if taunt_dr > 0:
+            dr += taunt_dr
         if target.has_status_tag("cc"):
             dr += target.get_status_modifier("damage_reduction_while_cc")
         if target.shield > 0:
@@ -189,6 +203,9 @@ class EffectExecutor:
 
         original_amount = amount
         source_str = f"[{source_skill}]" if source_skill else hero_tag(caster)
+
+        if taunt_dr > 0:
+            print(f"    {hero_tag(target)} reduced damage from taunted {hero_tag(caster)} by {taunt_dr*100:.0f}%.")
 
         if amount > 0 and target.shield > 0:
             absorbed = min(target.shield, amount)
@@ -409,7 +426,9 @@ class EffectExecutor:
                 data = merged
 
             if effect.params.get("damage_reduction_pct") is not None and status_name == "taunt":
-                data["taunt_damage_reduction_pct"] = float(effect.params.get("damage_reduction_pct")) / 100.0
+                value = float(effect.params.get("damage_reduction_pct")) / 100.0
+                data["taunt_damage_reduction_pct"] = value
+                data["damage_reduction_vs_taunter"] = value
 
             chance = float(effect.params.get("chance", 1.0))
 

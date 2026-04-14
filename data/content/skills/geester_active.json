@@ -10,7 +10,7 @@
             {
               "type": "set_stack",
               "stack": "attack_times",
-              "value": "3 + stacks['polymer_essence'] * 2",
+              "value": "2 + stacks['polymer_essence'] * 2",
               "target": "self"
             },
             {
@@ -31,7 +31,7 @@
                 },
                 {
                   "type": "apply_dot_percent_damage_dealt",
-                  "pct": 0.5,
+                  "pct": 0.4,
                   "damage_basis": "target_actual",
                   "target": "event_target",
                   "duration": 2
@@ -48,7 +48,7 @@
             {
               "type": "set_stack",
               "stack": "attack_times",
-              "value": "3 + stacks['polymer_essence']",
+              "value": "1 + stacks['polymer_essence']",
               "target": "self"
             },
             {
@@ -69,7 +69,7 @@
                 },
                 {
                   "type": "apply_dot_percent_damage_dealt",
-                  "pct": 0.5,
+                  "pct": 0.4,
                   "damage_basis": "target_actual",
                   "target": "event_target",
                   "duration": 2

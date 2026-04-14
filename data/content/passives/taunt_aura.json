@@ -5,11 +5,13 @@
       "trigger_event": "turn_start",
       "effects": [
         {
-          "type": "apply_cc",
-          "cc_type": "taunt",
+          "type": "apply_status",
+          "status": "taunt",
           "duration": 1,
-          "damage_reduction_pct": 30,
-          "target_1_random_enemy": true
+          "target": { "selector": "random_enemies", "n": 1 },
+          "data": {
+            "damage_reduction_vs_taunter": 0.1
+          }
         }
       ]
     }

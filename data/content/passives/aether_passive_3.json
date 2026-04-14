@@ -12,7 +12,7 @@
           "tags": ["buff"],
           "data": {
             "modifiers": {
-              "damage_reduction_while_cc": 0.15
+              "damage_reduction_while_cc": 0.2
             }
           },
           "hooks": {
@@ -40,7 +40,7 @@
                     "tags": ["buff"],
                     "data": {
                       "modifiers": {
-                        "damage_reduction": 0.1
+                        "damage_reduction": 0.2
                       }
                     }
                   },
