@@ -46,7 +46,17 @@ class BattleEngine:
         return min(enemies, key=lambda hero: hero.hp)
 
     def _is_disabled(self, hero: Hero) -> bool:
-        return any("disable" in status.tags for status in hero.statuses)
+        return len(self._disable_status_names(hero)) > 0
+
+    def _disable_status_names(self, hero: Hero) -> List[str]:
+        out: List[str] = []
+        for status in hero.statuses:
+            # Taunt should only force target selection, not skip turns.
+            if status.data.get("force_target_source", False):
+                continue
+            if "disable" in status.tags:
+                out.append(status.name)
+        return out
 
     def _hook_order_key(self, hook: Dict[str, Any]):
         timing = str(hook.get("timing", "normal")).lower()
@@ -225,7 +235,11 @@ class BattleEngine:
                 self.emit_event("turn_start", hero, [hero], {})
 
                 if self._is_disabled(hero):
-                    print(f"    {hero_tag(hero)} is disabled and cannot act.")
+                    reasons = ", ".join(self._disable_status_names(hero))
+                    if reasons:
+                        print(f"    {hero_tag(hero)} is disabled by [{reasons}] and cannot act.")
+                    else:
+                        print(f"    {hero_tag(hero)} is disabled and cannot act.")
                     continue
 
                 self.action_damaged_targets.clear()
