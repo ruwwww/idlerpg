@@ -15,15 +15,20 @@
                   "type": "damage",
                   "mult": 0.8,
                   "target": "event_target"
-                },
-                {
-                  "type": "add_shield",
-                  "mult": 0.3,
-                  "target": "self"
                 }
               ]
             }
           ]
+        },
+        {
+          "type": "add_shield",
+          "mult": 0.3,
+          "target": "self"
+        },
+        {
+          "type": "add_shield",
+          "mult": 0.3,
+          "target": { "selector": "lowest_hp_allies_priority" }
         },
         {
           "type": "heal_percent_actual_damage_dealt",

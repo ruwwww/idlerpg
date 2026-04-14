@@ -105,6 +105,11 @@ class TargetResolver:
             if other_allies:
                 return [min(other_allies, key=lambda h: h.hp / max(1, h.max_hp))]
             return [caster]
+        if selector == "lowest_hp_allies_priority":
+            other_allies = [h for h in allies if h != caster]
+            if other_allies:
+                return [min(other_allies, key=lambda h: h.hp)]
+            return [caster]
         if selector == "second_lowest_hp_pct_allies":
             other_allies = [h for h in allies if h != caster]
             if len(other_allies) < 2:
