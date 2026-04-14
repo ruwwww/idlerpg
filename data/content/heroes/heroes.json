@@ -43,7 +43,7 @@
       "hp": 250000,
       "defense": 9000,
       "active_skill": "love_waves",
-      "passives": ["love_protection"]
+      "passives": ["love_protection", "angela_last_grace"]
     },
     "argus": {
       "name": "Argus",
@@ -65,9 +65,9 @@
     },
     "selena": {
       "name": "Selena",
-      "speed": 1280,
+      "speed": 1300,
       "atk": 54000,
-      "hp": 210000,
+      "hp": 228000,
       "defense": 7000,
       "role": "mage",
       "type": "cc",

@@ -107,6 +107,15 @@ class EffectExecutor:
             meta_target = ctx.metadata.get("event_target")
             return meta_target is not None and meta_target == target
 
+        if ctype == "is_event_target_ally":
+            meta_target = ctx.metadata.get("event_target")
+            return (
+                meta_target is not None
+                and getattr(meta_target, "team", None) is not None
+                and getattr(target, "team", None) is not None
+                and meta_target.team == target.team
+            )
+
         if ctype == "is_event_source":
             meta_source = ctx.metadata.get("event_source")
             return meta_source is not None and meta_source == target
@@ -166,20 +175,29 @@ class EffectExecutor:
         hp_dealt = 0.0
 
         taunt_dr = 0.0
+        taunted_attacker = False
         for status in caster.statuses:
             if not status.data.get("force_target_source", False):
                 continue
             if status.source_name != target.name:
                 continue
+            taunted_attacker = True
             value = status.data.get("damage_reduction_vs_taunter")
             if value is None:
                 value = status.data.get("taunt_damage_reduction_pct", 0.0)
             if isinstance(value, (int, float)):
                 taunt_dr = max(taunt_dr, float(value))
 
+        taunted_enemy_dr = 0.0
+        if taunted_attacker:
+            taunted_enemy_dr += target.get_status_modifier("damage_reduction_from_taunted_enemies")
+            taunted_enemy_dr += target.get_status_modifier("damage_reduction_vs_taunted_enemy")
+
         dr = target.get_status_modifier("damage_reduction")
         if taunt_dr > 0:
             dr += taunt_dr
+        if taunted_enemy_dr > 0:
+            dr += taunted_enemy_dr
         if target.has_status_tag("cc"):
             dr += target.get_status_modifier("damage_reduction_while_cc")
         if target.shield > 0:
@@ -206,12 +224,30 @@ class EffectExecutor:
 
         if taunt_dr > 0:
             print(f"    {hero_tag(target)} reduced damage from taunted {hero_tag(caster)} by {taunt_dr*100:.0f}%.")
+        if taunted_enemy_dr > 0:
+            print(
+                f"    {hero_tag(target)} gained extra reduction vs taunted {hero_tag(caster)} "
+                f"by {taunted_enemy_dr*100:.0f}% from passive."
+            )
 
         if amount > 0 and target.shield > 0:
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
             shield_dealt += absorbed
+            remaining_absorb = absorbed
+            for status in target.statuses:
+                data = status.data if isinstance(status.data, dict) else {}
+                pool = data.get("temporary_shield_pool")
+                if not isinstance(pool, (int, float)):
+                    continue
+                if pool <= 0 or remaining_absorb <= 0:
+                    continue
+                used = min(float(pool), remaining_absorb)
+                data["temporary_shield_pool"] = max(0.0, float(pool) - used)
+                remaining_absorb -= used
+                if remaining_absorb <= 0:
+                    break
             target.combat_stats["damage_taken_shield"] += absorbed
             caster.combat_stats["damage_dealt_shield"] += absorbed
             if damage_type == "dot":
@@ -556,6 +592,9 @@ class EffectExecutor:
             targets = self._resolve_targets(effect, ctx)
             mult = float(effect.params.get("mult", 0.0))
             max_hp_pct = float(effect.params.get("max_hp_pct", 0.0))
+            target_max_hp_pct = float(effect.params.get("target_max_hp_pct", 0.0))
+            duration = int(effect.params.get("duration", 0))
+            shield_status_name = str(effect.params.get("status", "temporary_shield"))
             for target in targets:
                 if not target or not target.is_alive:
                     continue
@@ -564,6 +603,8 @@ class EffectExecutor:
                     amount += ctx.caster.compute_final_atk() * mult
                 if max_hp_pct > 0:
                     amount += ctx.caster.max_hp * max_hp_pct
+                if target_max_hp_pct > 0:
+                    amount += target.max_hp * target_max_hp_pct
                 amount = self._apply_outgoing_shield_scaling(amount, ctx.caster)
                 amount = self._apply_shield_scaling(amount, target)
                 if amount > 0:
@@ -572,6 +613,25 @@ class EffectExecutor:
                     gained = target.shield - before
                     if gained <= 0:
                         continue
+                    if duration > 0:
+                        existing = target.get_status(shield_status_name)
+                        if existing:
+                            existing.duration = max(existing.duration, duration)
+                            existing.tags = list(set(existing.tags + ["buff", "temporary_shield"]))
+                            existing.data["temporary_shield_pool"] = float(existing.data.get("temporary_shield_pool", 0.0)) + gained
+                        else:
+                            target.statuses.append(
+                                Status(
+                                    name=shield_status_name,
+                                    duration=duration,
+                                    stacks=1,
+                                    tags=["buff", "temporary_shield"],
+                                    data={"temporary_shield_pool": gained},
+                                    hooks={},
+                                    source_name=ctx.caster.name,
+                                    source_skill=ctx.metadata.get("source_skill"),
+                                )
+                            )
                     ctx.caster.combat_stats["shielding_done"] += gained
                     print(f"    {hero_tag(target)} gained {gained:.0f} shield (Total: {target.shield:.0f}).")
 

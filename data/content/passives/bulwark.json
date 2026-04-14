@@ -8,6 +8,18 @@
           "type": "modify_stat",
           "stat_type": "max_hp",
           "mult": 1.2
+        },
+        {
+          "type": "apply_status",
+          "status": "bulwark_guard",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "damage_reduction_from_taunted_enemies": 0.1
+            }
+          }
         }
       ]
     }

@@ -1,7 +1,7 @@
 {
   "passives": {
     "selena_basic_protocol": {
-      "name": "Abyssal Basic Protocol",
+      "name": "Abyssal Traits",
       "trigger_event": "on_basic_hit",
       "effects": [
         {
@@ -24,11 +24,11 @@
         {
           "type": "apply_status",
           "status": "selena_guard",
-          "duration": 1,
+          "duration": 2,
           "target": "self",
           "tags": ["buff"],
           "data": {
-            "damage_reduction": 0.05
+            "damage_reduction": 0.1
           }
         }
       ]

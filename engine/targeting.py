@@ -110,6 +110,12 @@ class TargetResolver:
             if other_allies:
                 return [min(other_allies, key=lambda h: h.hp)]
             return [caster]
+        if selector == "highest_atk_allies_priority":
+            other_allies = [h for h in allies if h != caster]
+            pool = other_allies or allies
+            if pool:
+                return [max(pool, key=lambda h: h.compute_final_atk())]
+            return []
         if selector == "second_lowest_hp_pct_allies":
             other_allies = [h for h in allies if h != caster]
             if len(other_allies) < 2:

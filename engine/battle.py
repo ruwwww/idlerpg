@@ -101,11 +101,14 @@ class BattleEngine:
 
         if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create"]:
             trigger_pool = [caster]
+        elif event_name == "on_death":
+            trigger_pool = list(self.all_heroes)
         else:
             trigger_pool = [hero for hero in self.all_heroes if hero.is_alive]
 
         for hero in trigger_pool:
-            if not hero.is_alive:
+            allow_dead_owner = event_name == "on_death" and hero == metadata.get("event_target")
+            if not hero.is_alive and not allow_dead_owner:
                 continue
             for passive in hero.passives:
                 if passive.trigger_event != event_name:
@@ -129,7 +132,8 @@ class BattleEngine:
                 self.listeners.remove(listener)
 
         for hero in trigger_pool:
-            if hero.is_alive:
+            allow_dead_owner = event_name == "on_death" and hero == metadata.get("event_target")
+            if hero.is_alive or allow_dead_owner:
                 hook_name = event_name if event_name.startswith("on_") else f"on_{event_name}"
                 self._trigger_status_hooks(hook_name, hero, metadata)
 
@@ -208,6 +212,13 @@ class BattleEngine:
             for status in hero.statuses[:]:
                 status.duration -= 1
                 if status.duration <= 0:
+                    data = status.data if isinstance(status.data, dict) else {}
+                    pool = data.get("temporary_shield_pool")
+                    if isinstance(pool, (int, float)) and pool > 0 and hero.shield > 0:
+                        removed = min(hero.shield, float(pool))
+                        hero.shield = max(0.0, hero.shield - removed)
+                        if removed > 0:
+                            print(f"    {hero_tag(hero)} temporary shield expired for {removed:.0f}.")
                     hero.statuses.remove(status)
 
             for buff in hero.buffs[:]:

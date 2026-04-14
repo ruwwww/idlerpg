@@ -5,7 +5,7 @@
       "effects": [
         {
           "type": "repeat",
-          "times": 3,
+          "times": 4,
           "effects": [
             {
               "type": "with_target",
@@ -13,7 +13,7 @@
               "effects": [
                 {
                   "type": "damage",
-                  "mult": 0.8,
+                  "mult": 0.6,
                   "target": "event_target"
                 }
               ]
@@ -22,12 +22,12 @@
         },
         {
           "type": "add_shield",
-          "mult": 0.3,
+          "mult": 0.7,
           "target": "self"
         },
         {
           "type": "add_shield",
-          "mult": 0.3,
+          "mult": 0.5,
           "target": { "selector": "lowest_hp_allies_priority" }
         },
         {

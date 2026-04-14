@@ -1,0 +1,79 @@
+{
+  "passives": {
+    "angela_last_grace": {
+      "name": "Angela Last Grace",
+      "trigger_event": "on_death",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "is_event_target_ally",
+            "target": "self"
+          },
+          "then": [
+            {
+              "type": "apply_status",
+              "status": "angela_grace_dr",
+              "duration": 2,
+              "target": "all_allies",
+              "tags": ["buff"],
+              "data": {
+                "modifiers": {
+                  "damage_reduction": 0.1
+                }
+              }
+            },
+            {
+              "type": "apply_status",
+              "status": "angela_grace_atk",
+              "duration": 2,
+              "target": "all_allies",
+              "tags": ["buff"],
+              "data": {
+                "modifiers": {
+                  "atk_mult": 0.15
+                }
+              }
+            },
+            {
+              "type": "repeat",
+              "times": 2,
+              "effects": [
+                {
+                  "type": "dispel_random_debuff",
+                  "target": "all_allies"
+                }
+              ]
+            },
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "is_event_target",
+                "target": "self"
+              },
+              "then": [
+                {
+                  "type": "modify_stat",
+                  "stat_type": "energy",
+                  "add": 100,
+                  "target": {
+                    "selector": "highest_atk_allies_priority"
+                  }
+                },
+                {
+                  "type": "add_shield",
+                  "target_max_hp_pct": 0.7,
+                  "duration": 3,
+                  "status": "angela_last_grace_shield",
+                  "target": {
+                    "selector": "highest_atk_allies_priority"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
