@@ -58,6 +58,8 @@ class EffectContext:
     event: str = ""
     round: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
+    damage_dealt: float = 0.0
+    status: Optional[Status] = None
 
 
 class Hero:

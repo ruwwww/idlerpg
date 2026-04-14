@@ -69,7 +69,7 @@ class BattleEngine:
             ]
             self.executor.execute_list(
                 nested,
-                EffectContext(self, source, [owner], event_name, self.round, {"status": status, "owner": owner}),
+                EffectContext(self, source, [owner], event_name, self.round, {"owner": owner}, status=status),
             )
 
     def find_hero_by_name(self, name: Optional[str]) -> Optional[Hero]:
@@ -113,7 +113,7 @@ class BattleEngine:
             if listener["duration"] <= 0:
                 self.listeners.remove(listener)
 
-        for hero in self.all_heroes:
+        for hero in trigger_pool:
             if hero.is_alive:
                 self._trigger_status_hooks(f"on_{event_name}", hero)
 

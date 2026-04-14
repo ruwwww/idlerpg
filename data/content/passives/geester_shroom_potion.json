@@ -1,0 +1,71 @@
+{
+  "passives": {
+    "geester_shroom_potion": {
+      "name": "Geester Shroom Potion",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "geester_shroom_passive",
+          "duration": 999,
+          "target": "self",
+          "hooks": {
+            "on_battle_start": [
+              {
+                "type": "add_stack",
+                "stack": "shroom_potion",
+                "amount": 2,
+                "target": "self"
+              }
+            ],
+            "on_active_skill_used": [
+              {
+                "type": "sequence",
+                "effects": [
+                  {
+                    "type": "consume_stack",
+                    "stack": "shroom_potion",
+                    "amount": 1,
+                    "target": "self"
+                  },
+                  {
+                    "type": "add_stack",
+                    "stack": "polymer_essence",
+                    "amount": 1,
+                    "target": "self"
+                  },
+                  {
+                    "type": "conditional",
+                    "condition": {
+                      "type": "stack_lte",
+                      "stack": "shroom_potion",
+                      "value": 0
+                    },
+                    "then": [
+                      {
+                        "type": "apply_status",
+                        "status": "bloomed",
+                        "duration": 999
+                      },
+                      {
+                        "type": "heal_max_hp_pct",
+                        "pct": 0.5,
+                        "target": "self"
+                      },
+                      {
+                        "type": "add_stack",
+                        "stack": "polymer_essence",
+                        "amount": 2,
+                        "target": "self"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "skills": {
+    "geester_basic_attack": {
+      "name": "Geester Basic Attack",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.0,
+          "target": "lowest_hp_enemy"
+        },
+        {
+          "type": "apply_dot_percent_damage_dealt",
+          "pct": 0.6,
+          "target": "lowest_hp_enemy",
+          "duration": 2
+        },
+        {
+          "type": "add_stack",
+          "stack": "polymer_essence",
+          "amount": 1,
+          "target": "self"
+        }
+      ]
+    }
+  }
+}

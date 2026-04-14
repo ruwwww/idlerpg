@@ -87,12 +87,17 @@ class EffectExecutor:
 
         return False
 
-    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool):
+    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical"):
         amount = max(0.0, amount)
 
         dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
+        dr += 0.03 * target.stacks.get("shroom_potion", 0)
         if dr > 0:
             amount *= max(0.0, 1.0 - dr)
+
+        if damage_type == "dot":
+            dot_dr = sum(status.data.get("dot_damage_reduction", 0.0) for status in target.statuses)
+            amount *= max(0.0, 1.0 - dot_dr)
 
         dtu = sum(status.data.get("damage_taken_up", 0.0) for status in target.statuses)
         if dtu > 0:
@@ -119,20 +124,32 @@ class EffectExecutor:
         def h_damage(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             mult = float(effect.params.get("mult", 1.0))
+            amount_param = effect.params.get("amount")
+            no_crit = effect.params.get("no_crit", False)
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                dmg = ctx.caster.compute_final_atk() * mult
+                if amount_param is not None:
+                    if isinstance(amount_param, str) and ctx.status and amount_param.startswith("data."):
+                        key = amount_param[5:]
+                        dmg = float(ctx.status.data.get(key, 0.0))
+                    else:
+                        dmg = float(amount_param)
+                else:
+                    dmg = ctx.caster.compute_final_atk() * mult
                 hp_threshold_pct = effect.params.get("hp_threshold_pct")
                 if hp_threshold_pct is not None:
                     if (target.hp / max(1, target.max_hp)) < (float(hp_threshold_pct) / 100.0):
                         dmg *= float(effect.params.get("hp_threshold_mult", 1.0))
 
-                is_crit = random.random() < max(0.0, min(1.0, ctx.caster.crit_chance))
-                if is_crit:
-                    dmg *= ctx.caster.crit_damage
+                is_crit = False
+                if not no_crit:
+                    is_crit = random.random() < max(0.0, min(1.0, ctx.caster.crit_chance))
+                    if is_crit:
+                        dmg *= ctx.caster.crit_damage
 
-                self._apply_damage(target, dmg, ctx.caster, is_crit)
+                self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"))
+                ctx.damage_dealt += dmg
 
                 shield_steal_pct = float(effect.params.get("shield_steal_pct", 0.0))
                 if shield_steal_pct > 0 and dmg > 0:
@@ -199,9 +216,9 @@ class EffectExecutor:
                     continue
 
                 incoming_is_cc = "cc" in tags
-                if incoming_is_cc and target.has_status_tag("cc_immunity"):
+                cc_immunity_pct = sum(status.data.get("cc_immunity_chance", 0.0) for status in target.statuses)
+                if incoming_is_cc and random.random() < cc_immunity_pct:
                     print(f"    {hero_tag(target)} blocked {status_name} with CC Immunity.")
-                    target.statuses = [status for status in target.statuses if "cc_immunity" not in status.tags]
                     continue
 
                 existing = target.get_status(status_name)
@@ -269,7 +286,11 @@ class EffectExecutor:
         def h_set_stack(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             stack_name = effect.params.get("stack")
-            value = int(effect.params.get("value", 0))
+            value_param = effect.params.get("value", 0)
+            if isinstance(value_param, str):
+                value = int(eval(value_param, {"stacks": ctx.caster.stacks}))
+            else:
+                value = int(value_param)
             for target in targets:
                 target.stacks[stack_name] = max(0, value)
                 print(f"    {hero_tag(target)} stack {stack_name} set to {target.stacks[stack_name]}.")
@@ -297,6 +318,51 @@ class EffectExecutor:
             nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
             for _ in range(max(0, times)):
                 self.execute_list(nested, ctx)
+
+        self.handlers["repeat"] = h_repeat
+
+        def h_repeat_stack_based(effect: Effect, ctx: EffectContext):
+            stack_name = effect.params.get("stack")
+            base_times = int(effect.params.get("base_times", 0))
+            times = base_times + ctx.caster.stacks.get(stack_name, 0)
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
+            for _ in range(max(0, times)):
+                self.execute_list(nested, ctx)
+
+        self.handlers["repeat_stack_based"] = h_repeat_stack_based
+
+        def h_with_target(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            if not targets:
+                return
+            new_ctx = EffectContext(
+                battle=ctx.battle,
+                caster=ctx.caster,
+                targets=targets,
+                event=ctx.event,
+                round=ctx.round,
+                metadata=ctx.metadata,
+                damage_dealt=ctx.damage_dealt,
+                status=ctx.status,
+            )
+            nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
+            self.execute_list(nested, new_ctx)
+            ctx.damage_dealt = new_ctx.damage_dealt
+
+        self.handlers["with_target"] = h_with_target
+
+        def h_dispel_random_debuff(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            for target in targets:
+                debuffs = [status for status in target.statuses if "debuff" in status.tags]
+                if debuffs:
+                    dispelled = random.choice(debuffs)
+                    target.statuses.remove(dispelled)
+                    print(f"    {hero_tag(target)} dispelled {dispelled.name}.")
+                else:
+                    print(f"    {hero_tag(target)} has no debuffs to dispel.")
+
+        self.handlers["dispel_random_debuff"] = h_dispel_random_debuff
 
         def h_heal_max_hp_pct(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -343,6 +409,18 @@ class EffectExecutor:
                 target.behavior[key] = {"value": value, "until_round": self.battle.round + duration}
                 print(f"    {hero_tag(target)} behavior {key} modified for {duration} rounds.")
 
+        def h_heal_percent_damage_dealt(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.2))
+            amount = ctx.damage_dealt * pct
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                target.hp = min(target.max_hp, target.hp + amount)
+                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f} HP ({pct*100:.0f}% of damage dealt).")
+
+        self.handlers["heal_percent_damage_dealt"] = h_heal_percent_damage_dealt
+
         def h_apply_dot(effect: Effect, ctx: EffectContext):
             dot_status = Effect(
                 "apply_status",
@@ -362,6 +440,42 @@ class EffectExecutor:
                 },
             )
             h_apply_status(dot_status, ctx)
+
+        self.handlers["apply_dot"] = h_apply_dot
+
+        def h_apply_dot_percent_damage_dealt(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.5))
+            duration = int(effect.params.get("duration", 2))
+            status_name = effect.params.get("status", "dot")
+            dot_mult = 1.0 + sum(status.data.get("dot_damage_mult", 0.0) for status in ctx.caster.statuses)
+            amount = ctx.damage_dealt * pct * dot_mult
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                status = Status(
+                    name=status_name,
+                    duration=duration,
+                    stacks=1,
+                    tags=["dot", "debuff"],
+                    data={"dot_damage": amount},
+                    hooks={
+                        "on_turn_end": [{
+                            "priority": 10,
+                            "timing": "normal",
+                            "type": "damage",
+                            "amount": "data.dot_damage",
+                            "target": "self",
+                            "no_crit": True,
+                            "damage_type": "dot"
+                        }]
+                    },
+                    source_name=ctx.caster.name,
+                )
+                target.statuses.append(status)
+                print(f"    {hero_tag(target)} gained DoT ({duration} rounds, {amount:.0f} damage/turn).")
+
+        self.handlers["apply_dot_percent_damage_dealt"] = h_apply_dot_percent_damage_dealt
 
         # Compatibility handlers for older content.
         def h_apply_cc(effect: Effect, ctx: EffectContext):

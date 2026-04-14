@@ -1,0 +1,80 @@
+{
+  "skills": {
+    "geester_active": {
+      "name": "Geester Active",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": { "type": "status_exists", "status": "bloomed" },
+          "then": [
+            {
+              "type": "set_stack",
+              "stack": "attack_times",
+              "value": "3 + stacks['polymer_essence'] * 2",
+              "target": "self"
+            },
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 3 },
+              "effects": [
+                {
+                  "type": "repeat_stack_based",
+                  "stack": "attack_times",
+                  "base_times": 0,
+                  "effects": [
+                    { "type": "damage", "mult": 1.0, "target": "event_target" }
+                  ]
+                },
+                {
+                  "type": "apply_dot_percent_damage_dealt",
+                  "pct": 0.5,
+                  "target": "event_target",
+                  "duration": 2
+                },
+                {
+                  "type": "heal_percent_damage_dealt",
+                  "pct": 0.2,
+                  "target": "self"
+                }
+              ]
+            }
+          ],
+          "else": [
+            {
+              "type": "set_stack",
+              "stack": "attack_times",
+              "value": "3 + stacks['polymer_essence']",
+              "target": "self"
+            },
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 1 },
+              "effects": [
+                {
+                  "type": "repeat_stack_based",
+                  "stack": "attack_times",
+                  "base_times": 0,
+                  "effects": [
+                    { "type": "damage", "mult": 1.0, "target": "event_target" }
+                  ]
+                },
+                {
+                  "type": "apply_dot_percent_damage_dealt",
+                  "pct": 0.5,
+                  "target": "event_target",
+                  "duration": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "add_stack",
+          "stack": "polymer_essence",
+          "amount": 2,
+          "target": "self"
+        }
+      ]
+    }
+  }
+}
