@@ -1,8 +1,8 @@
 {
   "teams": {
-    "team1_default": ["geester", "brutus", "angela", "galatea"],
+    "team1_default": ["argus", "brutus", "angela", "galatea", "rexus"],
     "team2_default": ["argus", "angela", "brutus", "galatea"],
     "team1_mythos_demo": ["brutus"],
-    "team1_rexus_demo": ["rexus", "fredrin", "selena", "tara"]
+    "team1_rexus_demo": ["rexus", "fredrin", "selena", "geester", "mareia"]
   }
 }

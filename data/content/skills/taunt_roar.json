@@ -7,7 +7,7 @@
           "type": "apply_cc",
           "cc_type": "taunt",
           "duration": 2,
-          "damage_reduction_pct": 50,
+          "damage_reduction_pct": 15,
           "target_2_random_enemies": true
         }
       ]

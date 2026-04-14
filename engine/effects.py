@@ -152,8 +152,10 @@ class EffectExecutor:
         shield_down = target.get_status_modifier("shield_reduction") + target.get_status_modifier("shielding_reduction")
         return amount * max(0.0, 1.0 + shield_up - shield_down)
 
-    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None):
+    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None) -> float:
         amount = max(0.0, amount)
+        shield_dealt = 0.0
+        hp_dealt = 0.0
 
         dr = target.get_status_modifier("damage_reduction")
         if target.shield > 0:
@@ -182,6 +184,7 @@ class EffectExecutor:
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
+            shield_dealt += absorbed
             target.combat_stats["damage_taken_shield"] += absorbed
             caster.combat_stats["damage_dealt_shield"] += absorbed
             if damage_type == "dot":
@@ -196,7 +199,9 @@ class EffectExecutor:
                 print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
 
         if amount > 0:
+            hp_before = max(0.0, target.hp)
             target.hp -= amount
+            hp_dealt += min(amount, hp_before)
             target.combat_stats["damage_taken_hp"] += amount
             caster.combat_stats["damage_dealt_hp"] += amount
             print(f"    {hero_tag(target)} now has {max(0, target.hp):.0f}/{target.max_hp:.0f} HP.")
@@ -206,6 +211,7 @@ class EffectExecutor:
                 self.battle.emit_event("on_death", caster, [target], {"dead": target, "event_source": caster, "event_target": target})
 
         target.energy = min(999, target.energy + (20 if is_crit else 10))
+        return shield_dealt + hp_dealt
 
     def _register_default_handlers(self):
         def h_damage(effect: Effect, ctx: EffectContext):
@@ -244,8 +250,15 @@ class EffectExecutor:
                         dmg *= crit_mult
 
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
-                self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)
+                dealt_actual = self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)
                 ctx.damage_dealt += dmg
+                ctx.damage_dealt_actual += dealt_actual
+                ctx.metadata["action_damage_dealt_raw"] = float(ctx.metadata.get("action_damage_dealt_raw", 0.0)) + dmg
+                ctx.metadata["action_damage_dealt_actual"] = float(ctx.metadata.get("action_damage_dealt_actual", 0.0)) + dealt_actual
+                raw_by_target = ctx.metadata.setdefault("action_damage_by_target_raw", {})
+                actual_by_target = ctx.metadata.setdefault("action_damage_by_target_actual", {})
+                raw_by_target[target.name] = float(raw_by_target.get(target.name, 0.0)) + dmg
+                actual_by_target[target.name] = float(actual_by_target.get(target.name, 0.0)) + dealt_actual
                 if not effect.params.get("no_counter", False):
                     self.battle.action_damaged_targets.append(target)
                     self.battle.emit_event(
@@ -277,7 +290,7 @@ class EffectExecutor:
 
                 dmg = target.max_hp * pct
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
-                self._apply_damage(
+                dealt_actual = self._apply_damage(
                     target,
                     dmg,
                     ctx.caster,
@@ -286,6 +299,13 @@ class EffectExecutor:
                     source_skill=source_skill,
                 )
                 ctx.damage_dealt += dmg
+                ctx.damage_dealt_actual += dealt_actual
+                ctx.metadata["action_damage_dealt_raw"] = float(ctx.metadata.get("action_damage_dealt_raw", 0.0)) + dmg
+                ctx.metadata["action_damage_dealt_actual"] = float(ctx.metadata.get("action_damage_dealt_actual", 0.0)) + dealt_actual
+                raw_by_target = ctx.metadata.setdefault("action_damage_by_target_raw", {})
+                actual_by_target = ctx.metadata.setdefault("action_damage_by_target_actual", {})
+                raw_by_target[target.name] = float(raw_by_target.get(target.name, 0.0)) + dmg
+                actual_by_target[target.name] = float(actual_by_target.get(target.name, 0.0)) + dealt_actual
 
                 if not effect.params.get("no_counter", False):
                     self.battle.action_damaged_targets.append(target)
@@ -546,11 +566,13 @@ class EffectExecutor:
                 round=ctx.round,
                 metadata=ctx.metadata,
                 damage_dealt=ctx.damage_dealt,
+                damage_dealt_actual=ctx.damage_dealt_actual,
                 status=ctx.status,
             )
             nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
             self.execute_list(nested, new_ctx)
             ctx.damage_dealt = new_ctx.damage_dealt
+            ctx.damage_dealt_actual = new_ctx.damage_dealt_actual
 
         self.handlers["with_target"] = h_with_target
 
@@ -699,10 +721,27 @@ class EffectExecutor:
             duration = int(effect.params.get("duration", 2))
             status_name = effect.params.get("status", "dot")
             dot_mult = 1.0 + ctx.caster.get_status_modifier("dot_damage_mult")
-            amount = ctx.damage_dealt * pct * dot_mult
+            damage_basis = str(effect.params.get("damage_basis", "action_actual")).lower()
+            raw_by_target = ctx.metadata.get("action_damage_by_target_raw", {})
+            actual_by_target = ctx.metadata.get("action_damage_by_target_actual", {})
+
+            if damage_basis in ["action_raw", "raw"]:
+                default_base_damage = ctx.damage_dealt
+            else:
+                default_base_damage = ctx.damage_dealt_actual if ctx.damage_dealt_actual > 0 else ctx.damage_dealt
+
             for target in targets:
                 if not target or not target.is_alive:
                     continue
+
+                if damage_basis in ["target_raw", "event_target_raw"]:
+                    base_damage = float(raw_by_target.get(target.name, 0.0))
+                elif damage_basis in ["target_actual", "event_target_actual"]:
+                    base_damage = float(actual_by_target.get(target.name, 0.0))
+                else:
+                    base_damage = default_base_damage
+
+                amount = base_damage * pct * dot_mult
                 status = Status(
                     name=status_name,
                     duration=duration,
@@ -724,7 +763,7 @@ class EffectExecutor:
                     source_skill=ctx.metadata.get("source_skill")
                 )
                 target.statuses.append(status)
-                print(f"    {hero_tag(target)} gained DoT ({duration} rounds, {amount:.0f} damage/turn).")
+                print(f"    {hero_tag(target)} gained DoT ({duration} rounds, {amount:.0f} damage/turn) from {base_damage:.0f} {damage_basis} damage.")
 
         self.handlers["apply_dot_percent_damage_dealt"] = h_apply_dot_percent_damage_dealt
 
