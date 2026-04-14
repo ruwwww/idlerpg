@@ -1,0 +1,67 @@
+{
+  "passives": {
+    "aether_passive_3": {
+      "name": "Chains of Tranquility",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "aether_cc_barrier",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "damage_reduction_while_cc": 0.15
+            }
+          },
+          "hooks": {
+            "on_ally_receive_cc": [
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "all",
+                  "conditions": [
+                    { "type": "is_event_target", "target": "self" },
+                    {
+                      "type": "stack_lte",
+                      "target": "self",
+                      "stack": "aether_first_cc_triggered",
+                      "value": 0
+                    }
+                  ]
+                },
+                "then": [
+                  {
+                    "type": "apply_status",
+                    "status": "aether_resolute_shell",
+                    "duration": 2,
+                    "target": "self",
+                    "tags": ["buff"],
+                    "data": {
+                      "modifiers": {
+                        "damage_reduction": 0.1
+                      }
+                    }
+                  },
+                  {
+                    "type": "modify_stat",
+                    "stat_type": "energy",
+                    "add": 20,
+                    "target": "self"
+                  },
+                  {
+                    "type": "add_stack",
+                    "stack": "aether_first_cc_triggered",
+                    "amount": 1,
+                    "target": "self"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

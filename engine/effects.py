@@ -147,10 +147,18 @@ class EffectExecutor:
         heal_down = target.get_status_modifier("healing_reduction") + target.get_status_modifier("heal_reduction")
         return amount * max(0.0, 1.0 + heal_up - heal_down)
 
+    def _apply_outgoing_heal_scaling(self, amount: float, caster: Hero) -> float:
+        out_mult = caster.get_status_modifier("healing_done_mult") + caster.get_status_modifier("heal_effect_mult")
+        return amount * max(0.0, 1.0 + out_mult)
+
     def _apply_shield_scaling(self, amount: float, target: Hero) -> float:
         shield_up = target.get_status_modifier("shield_received_mult") + target.get_status_modifier("shielding_received_mult")
         shield_down = target.get_status_modifier("shield_reduction") + target.get_status_modifier("shielding_reduction")
         return amount * max(0.0, 1.0 + shield_up - shield_down)
+
+    def _apply_outgoing_shield_scaling(self, amount: float, caster: Hero) -> float:
+        out_mult = caster.get_status_modifier("shielding_done_mult") + caster.get_status_modifier("shield_effect_mult")
+        return amount * max(0.0, 1.0 + out_mult)
 
     def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None) -> float:
         amount = max(0.0, amount)
@@ -158,6 +166,8 @@ class EffectExecutor:
         hp_dealt = 0.0
 
         dr = target.get_status_modifier("damage_reduction")
+        if target.has_status_tag("cc"):
+            dr += target.get_status_modifier("damage_reduction_while_cc")
         if target.shield > 0:
             dr += target.get_status_modifier("shield_damage_reduction")
 
@@ -230,6 +240,10 @@ class EffectExecutor:
                         dmg = float(amount_param)
                 else:
                     dmg = ctx.caster.compute_final_atk() * mult
+                if ctx.event == "skill":
+                    skill_mult = ctx.caster.get_status_modifier("skill_damage_mult")
+                    if skill_mult != 0:
+                        dmg *= max(0.0, 1.0 + skill_mult)
                 hp_threshold_pct = effect.params.get("hp_threshold_pct")
                 if hp_threshold_pct is not None:
                     if (target.hp / max(1, target.max_hp)) < (float(hp_threshold_pct) / 100.0):
@@ -289,6 +303,10 @@ class EffectExecutor:
                     continue
 
                 dmg = target.max_hp * pct
+                if ctx.event == "skill":
+                    skill_mult = ctx.caster.get_status_modifier("skill_damage_mult")
+                    if skill_mult != 0:
+                        dmg *= max(0.0, 1.0 + skill_mult)
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
                 dealt_actual = self._apply_damage(
                     target,
@@ -328,7 +346,9 @@ class EffectExecutor:
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                amount = self._apply_heal_scaling(ctx.caster.compute_final_atk() * mult, target)
+                amount = ctx.caster.compute_final_atk() * mult
+                amount = self._apply_outgoing_heal_scaling(amount, ctx.caster)
+                amount = self._apply_heal_scaling(amount, target)
                 if amount <= 0:
                     continue
                 before = target.hp
@@ -506,6 +526,7 @@ class EffectExecutor:
                     amount += ctx.caster.compute_final_atk() * mult
                 if max_hp_pct > 0:
                     amount += ctx.caster.max_hp * max_hp_pct
+                amount = self._apply_outgoing_shield_scaling(amount, ctx.caster)
                 amount = self._apply_shield_scaling(amount, target)
                 if amount > 0:
                     before = target.shield
@@ -607,7 +628,9 @@ class EffectExecutor:
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                amount = self._apply_heal_scaling(target.max_hp * pct, target)
+                amount = target.max_hp * pct
+                amount = self._apply_outgoing_heal_scaling(amount, ctx.caster)
+                amount = self._apply_heal_scaling(amount, target)
                 if amount <= 0:
                     continue
                 before = target.hp
@@ -625,7 +648,9 @@ class EffectExecutor:
                 if not target or not target.is_alive:
                     continue
                 lost_hp = max(0.0, target.max_hp - target.hp)
-                amount = self._apply_heal_scaling(lost_hp * pct, target)
+                amount = lost_hp * pct
+                amount = self._apply_outgoing_heal_scaling(amount, ctx.caster)
+                amount = self._apply_heal_scaling(amount, target)
                 if amount <= 0:
                     continue
                 before = target.hp
@@ -678,7 +703,8 @@ class EffectExecutor:
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                scaled = self._apply_heal_scaling(amount, target)
+                scaled = self._apply_outgoing_heal_scaling(amount, ctx.caster)
+                scaled = self._apply_heal_scaling(scaled, target)
                 if scaled <= 0:
                     continue
                 before = target.hp
@@ -690,6 +716,27 @@ class EffectExecutor:
                 print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f} HP ({pct*100:.0f}% of damage dealt).")
 
         self.handlers["heal_percent_damage_dealt"] = h_heal_percent_damage_dealt
+
+        def h_heal_percent_actual_damage_dealt(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.2))
+            amount = ctx.damage_dealt_actual * pct
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                scaled = self._apply_outgoing_heal_scaling(amount, ctx.caster)
+                scaled = self._apply_heal_scaling(scaled, target)
+                if scaled <= 0:
+                    continue
+                before = target.hp
+                target.hp = min(target.max_hp, target.hp + scaled)
+                recovered = target.hp - before
+                if recovered <= 0:
+                    continue
+                ctx.caster.combat_stats["healing_done"] += recovered
+                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f} HP ({pct*100:.0f}% of actual damage dealt).")
+
+        self.handlers["heal_percent_actual_damage_dealt"] = h_heal_percent_actual_damage_dealt
 
         def h_apply_dot(effect: Effect, ctx: EffectContext):
             dot_status = Effect(

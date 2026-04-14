@@ -62,6 +62,8 @@ class TargetResolver:
 
         if selector == "lowest_hp_enemy":
             return [min(enemies, key=lambda h: h.hp / max(1, h.max_hp))] if enemies else []
+        if selector == "highest_crit_chance_enemy":
+            return [max(enemies, key=lambda h: h.crit_chance)] if enemies else []
         if selector == "highest_atk_enemies":
             sorted_enemies = sorted(enemies, key=lambda h: h.compute_final_atk(), reverse=True)
             return sorted_enemies[:n]
@@ -69,6 +71,17 @@ class TargetResolver:
             other_allies = [h for h in allies if h != caster]
             sorted_allies = sorted(other_allies, key=lambda h: h.hp / max(1, h.max_hp))
             return sorted_allies[:n]
+        if selector == "lowest_hp_pct_allies_priority":
+            other_allies = [h for h in allies if h != caster]
+            if other_allies:
+                return [min(other_allies, key=lambda h: h.hp / max(1, h.max_hp))]
+            return [caster]
+        if selector == "second_lowest_hp_pct_allies":
+            other_allies = [h for h in allies if h != caster]
+            if len(other_allies) < 2:
+                return []
+            sorted_allies = sorted(other_allies, key=lambda h: h.hp / max(1, h.max_hp))
+            return [sorted_allies[1]]
         if selector == "highest_atk_enemies":
             return sorted(enemies, key=lambda h: h.atk, reverse=True)[:n]
         if selector == "random_top_atk_enemies":

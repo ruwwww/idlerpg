@@ -111,6 +111,15 @@
       "defense": 11000,
       "active_skill": "rexus_active",
       "passives": ["rexus_passive_1", "rexus_passive_2", "rexus_passive_3"]
+    },
+    "aether": {
+      "name": "Aether",
+      "speed": 1300,
+      "atk": 46000,
+      "hp": 280000,
+      "defense": 9000,
+      "active_skill": "aether_active",
+      "passives": ["aether_passive_1", "aether_passive_2", "aether_passive_3"]
     }
   }
 }

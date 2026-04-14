@@ -1,0 +1,60 @@
+{
+  "skills": {
+    "aether_active": {
+      "name": "Celestial Cascade",
+      "effects": [
+        {
+          "type": "repeat",
+          "times": 3,
+          "effects": [
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 1 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.9,
+                  "target": "event_target"
+                },
+                {
+                  "type": "add_shield",
+                  "mult": 0.35,
+                  "target": "self"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heal_percent_actual_damage_dealt",
+          "pct": 0.4,
+          "target": "all_allies"
+        },
+        {
+          "type": "apply_status",
+          "status": "aether_guard_major",
+          "duration": 2,
+          "target": { "selector": "lowest_hp_pct_allies_priority" },
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "damage_reduction": 0.2
+            }
+          }
+        },
+        {
+          "type": "apply_status",
+          "status": "aether_guard_minor",
+          "duration": 2,
+          "target": { "selector": "second_lowest_hp_pct_allies" },
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "damage_reduction": 0.1
+            }
+          }
+        }
+      ]
+    }
+  }
+}
