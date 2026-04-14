@@ -1,0 +1,25 @@
+{
+  "passives": {
+    "brutus_passive_1": {
+      "name": "Brutus Resilience",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "max_hp",
+          "mult": 1.15,
+          "target": "self"
+        },
+        {
+          "type": "apply_status",
+          "status": "brutus_shield_dr",
+          "duration": 999,
+          "target": "self",
+          "data": {
+            "shield_damage_reduction": 0.1
+          }
+        }
+      ]
+    }
+  }
+}

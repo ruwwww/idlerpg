@@ -1,0 +1,30 @@
+{
+  "skills": {
+    "brutus_basic_attack": {
+      "name": "Brutus Bash",
+      "effects": [
+        {
+          "type": "with_target",
+          "target": { "selector": "highest_atk_enemies", "n": 2 },
+          "effects": [
+            {
+              "type": "damage",
+              "mult": 1.0,
+              "target": "event_target"
+            },
+            {
+              "type": "apply_status",
+              "status": "atk_reduction_15",
+              "duration": 2,
+              "target": "event_target",
+              "tags": ["debuff"],
+              "data": {
+                "atk_mult": -0.15
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -64,6 +64,12 @@ class EffectExecutor:
     def _condition_true(self, condition: Dict[str, Any], ctx: EffectContext) -> bool:
         ctype = condition.get("type")
 
+        if ctype == "all":
+            return all(self._condition_true(c, ctx) for c in condition.get("conditions", []))
+
+        if ctype == "any":
+            return any(self._condition_true(c, ctx) for c in condition.get("conditions", []))
+
         if ctype == "random_chance":
             return random.random() < float(condition.get("chance", 0.0))
 
@@ -85,6 +91,20 @@ class EffectExecutor:
         if ctype == "status_exists":
             return target.get_status(condition.get("status", "")) is not None
 
+        if ctype == "is_event_target":
+            meta_target = ctx.metadata.get("event_target")
+            return meta_target is not None and meta_target == target
+
+        if ctype == "event_metadata_match":
+            key = condition.get("key")
+            expected = condition.get("value")
+            return ctx.metadata.get(key) == expected
+
+        if ctype == "event_metadata_not_match":
+            key = condition.get("key")
+            expected = condition.get("value")
+            return ctx.metadata.get(key) != expected
+
         return False
 
     def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical"):
@@ -92,6 +112,9 @@ class EffectExecutor:
 
         dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
         dr += 0.03 * target.stacks.get("shroom_potion", 0)
+        if target.shield > 0:
+            dr += sum(status.data.get("shield_damage_reduction", 0.0) for status in target.statuses)
+        
         if dr > 0:
             amount *= max(0.0, 1.0 - dr)
 
@@ -150,6 +173,19 @@ class EffectExecutor:
 
                 self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"))
                 ctx.damage_dealt += dmg
+                if not effect.params.get("no_counter", False):
+                    self.battle.emit_event(
+                        "on_receive_damage",
+                        ctx.caster,
+                        [target],
+                        {
+                            "target": target,
+                            "damage": dmg,
+                            "damage_type": effect.params.get("damage_type", "physical"),
+                            "event_source": ctx.caster,
+                            "event_target": target,
+                        }
+                    )
 
                 shield_steal_pct = float(effect.params.get("shield_steal_pct", 0.0))
                 if shield_steal_pct > 0 and dmg > 0:
@@ -176,8 +212,10 @@ class EffectExecutor:
             for target in targets:
                 if stat_type == "max_hp":
                     if mult is not None:
+                        current_pct = target.hp / max(1.0, target.max_hp)
                         target.max_hp *= float(mult)
-                        target.hp = min(target.hp, target.max_hp)
+                        target.hp = target.max_hp * current_pct
+                        target.max_shield = target.max_hp
                         print(f"    {hero_tag(target)} max HP changed to {target.max_hp:.0f}.")
                     continue
                 if not hasattr(target, stat_type):
@@ -211,8 +249,13 @@ class EffectExecutor:
             if effect.params.get("damage_reduction_pct") is not None and status_name == "taunt":
                 data["taunt_damage_reduction_pct"] = float(effect.params.get("damage_reduction_pct")) / 100.0
 
+            chance = float(effect.params.get("chance", 1.0))
+
             for target in targets:
                 if not target or not target.is_alive:
+                    continue
+
+                if chance < 1.0 and random.random() >= chance:
                     continue
 
                 incoming_is_cc = "cc" in tags
@@ -302,6 +345,24 @@ class EffectExecutor:
             for target in targets:
                 target.stacks[stack_name] = max(0, target.stacks.get(stack_name, 0) - amount)
                 print(f"    {hero_tag(target)} consumed {amount} {stack_name} stack(s).")
+
+        def h_add_shield(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            mult = float(effect.params.get("mult", 0.0))
+            max_hp_pct = float(effect.params.get("max_hp_pct", 0.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                amount = 0.0
+                if mult > 0:
+                    amount += ctx.caster.compute_final_atk() * mult
+                if max_hp_pct > 0:
+                    amount += ctx.caster.max_hp * max_hp_pct
+                if amount > 0:
+                    target.shield = min(target.max_shield, target.shield + amount)
+                    print(f"    {hero_tag(target)} gained {amount:.0f} shield (Total: {target.shield:.0f}).")
+
+        self.handlers["add_shield"] = h_add_shield
 
         def h_sequence(effect: Effect, ctx: EffectContext):
             nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]

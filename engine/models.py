@@ -89,7 +89,8 @@ class Hero:
 
     def compute_final_atk(self) -> float:
         atk_bonus = sum(b.value for b in self.buffs if b.name == "atk_buff")
-        return self.atk * (1 + atk_bonus)
+        status_mult = sum(s.data.get("atk_mult", 0.0) for s in self.statuses)
+        return self.atk * max(0.0, (1.0 + atk_bonus + status_mult))
 
     def compute_final_speed(self) -> int:
         speed_bonus = int(sum(b.value for b in self.buffs if b.name == "speed_buff"))

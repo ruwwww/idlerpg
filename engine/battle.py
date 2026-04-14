@@ -53,7 +53,9 @@ class BattleEngine:
         priority = int(hook.get("priority", 100))
         return (timing_rank, priority)
 
-    def _trigger_status_hooks(self, event_name: str, owner: Hero):
+    def _trigger_status_hooks(self, event_name: str, owner: Hero, metadata: Optional[Dict[str, Any]] = None):
+        merged_meta = dict(metadata or {})
+        merged_meta["owner"] = owner
         for status in owner.statuses[:]:
             hooks = status.hooks.get(event_name, [])
             if not hooks:
@@ -69,7 +71,7 @@ class BattleEngine:
             ]
             self.executor.execute_list(
                 nested,
-                EffectContext(self, source, [owner], event_name, self.round, {"owner": owner}, status=status),
+                EffectContext(self, source, [owner], event_name, self.round, merged_meta, status=status),
             )
 
     def find_hero_by_name(self, name: Optional[str]) -> Optional[Hero]:
@@ -115,7 +117,7 @@ class BattleEngine:
 
         for hero in trigger_pool:
             if hero.is_alive:
-                self._trigger_status_hooks(f"on_{event_name}", hero)
+                self._trigger_status_hooks(f"on_{event_name}", hero, metadata)
 
     def execute_basic(self, caster: Hero):
         override = caster.behavior.get("basic_override")

@@ -83,6 +83,16 @@
       "basic_attack": "geester_basic_attack",
       "active_skill": "geester_active",
       "passives": ["geester_shroom_potion", "geester_dot_master"]
+    },
+    "brutus": {
+      "name": "Brutus",
+      "speed": 950,
+      "atk": 40000,
+      "hp": 300000,
+      "defense": 15000,
+      "basic_attack": "brutus_basic_attack",
+      "active_skill": "brutus_active",
+      "passives": ["brutus_passive_1", "brutus_passive_2"]
     }
   }
 }

@@ -1,0 +1,61 @@
+{
+  "passives": {
+    "brutus_passive_2": {
+      "name": "Brutus Retaliation",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "brutus_retaliation_stance",
+          "duration": 999,
+          "target": "self",
+          "hooks": {
+            "on_receive_damage": [
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "all",
+                  "conditions": [
+                    { "type": "is_event_target", "target": "self" },
+                    {
+                      "type": "event_metadata_not_match",
+                      "key": "damage_type",
+                      "value": "dot"
+                    }
+                  ]
+                },
+                "then": [
+                  {
+                    "type": "add_shield",
+                    "mult": 1.5,
+                    "target": "self"
+                  },
+                  {
+                    "type": "apply_status",
+                    "status": "brutus_counter_dr",
+                    "duration": 2,
+                    "target": "self",
+                    "data": { "damage_reduction": 0.03 }
+                  },
+                  {
+                    "type": "damage",
+                    "mult": 1.0,
+                    "target": "event_source"
+                  },
+                  {
+                    "type": "apply_status",
+                    "status": "atk_reduction_10",
+                    "duration": 2,
+                    "target": "event_source",
+                    "tags": ["debuff"],
+                    "data": { "atk_mult": -0.1 }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

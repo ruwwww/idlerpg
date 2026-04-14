@@ -49,6 +49,12 @@ class TargetResolver:
         if selector == "lowest_hp_enemy":
             return [min(enemies, key=lambda h: h.hp / max(1, h.max_hp))] if enemies else []
         if selector == "highest_atk_enemies":
+            sorted_enemies = sorted(enemies, key=lambda h: h.compute_final_atk(), reverse=True)
+            return sorted_enemies[:n]
+        if selector == "lowest_hp_pct_allies":
+            sorted_allies = sorted(allies, key=lambda h: h.hp / max(1, h.max_hp))
+            return sorted_allies[:n]
+        if selector == "highest_atk_enemies":
             return sorted(enemies, key=lambda h: h.atk, reverse=True)[:n]
         if selector == "random_top_atk_enemies":
             top_n = int(target_def.get("top_n", 3))
