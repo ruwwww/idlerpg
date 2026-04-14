@@ -8,7 +8,7 @@
           "effects": [
             {
               "type": "damage",
-              "mult": 1.7,
+              "mult": 0.9,
               "target": {
                 "selector": "marked_and_top_atk_others",
                 "status": "abyssal_eyes",

@@ -53,7 +53,7 @@
                 },
                 {
                   "type": "heal_percent_damage_dealt",
-                  "pct": 0.2,
+                  "pct": 0.4,
                   "target": "self"
                 }
               ]

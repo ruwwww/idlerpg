@@ -42,7 +42,7 @@
         },
         {
           "type": "add_shield",
-          "max_hp_pct": 0.2,
+          "max_hp_pct": 0.1.,
           "target": { "selector": "lowest_hp_pct_allies", "n": 2 }
         },
         {

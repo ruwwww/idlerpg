@@ -5,9 +5,9 @@
       "effects": [
         {
           "type": "damage",
-          "mult": 0.7,
+          "mult": 1,
           "mult_stack": "polymer_essence",
-          "mult_per_stack": 0.05,
+          "mult_per_stack": 0.1,
           "target": "lowest_hp_enemy"
         },
         {

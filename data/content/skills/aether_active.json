@@ -13,7 +13,7 @@
               "effects": [
                 {
                   "type": "damage",
-                  "mult": 0.6,
+                  "mult": 0.5,
                   "target": "event_target"
                 }
               ]
@@ -32,7 +32,7 @@
         },
         {
           "type": "heal_percent_actual_damage_dealt",
-          "pct": 0.4,
+          "pct": 0.3,
           "target": "all_allies"
         },
         {

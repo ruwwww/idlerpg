@@ -103,6 +103,12 @@ class BattleEngine:
             trigger_pool = [caster]
         elif event_name == "on_death":
             trigger_pool = list(self.all_heroes)
+        elif event_name == "on_ally_receive_cc":
+            event_target = metadata.get("event_target")
+            if event_target is not None and getattr(event_target, "team", None) is not None:
+                trigger_pool = [hero for hero in event_target.team.heroes if hero.is_alive]
+            else:
+                trigger_pool = [hero for hero in self.all_heroes if hero.is_alive]
         else:
             trigger_pool = [hero for hero in self.all_heroes if hero.is_alive]
 
