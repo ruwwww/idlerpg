@@ -32,7 +32,7 @@
                 {
                   "type": "apply_dot_percent_damage_dealt",
                   "pct": 0.5,
-                  "damage_basis": "target_raw",
+                  "damage_basis": "target_actual",
                   "target": "event_target",
                   "duration": 2
                 },
@@ -70,7 +70,7 @@
                 {
                   "type": "apply_dot_percent_damage_dealt",
                   "pct": 0.5,
-                  "damage_basis": "target_raw",
+                  "damage_basis": "target_actual",
                   "target": "event_target",
                   "duration": 2
                 }
