@@ -29,6 +29,7 @@ class Status:
     data: Dict[str, Any] = field(default_factory=dict)
     hooks: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     source_name: Optional[str] = None
+    source_skill: Optional[str] = None
 
 
 class Effect:

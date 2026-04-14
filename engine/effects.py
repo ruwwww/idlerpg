@@ -107,7 +107,7 @@ class EffectExecutor:
 
         return False
 
-    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical"):
+    def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None):
         amount = max(0.0, amount)
 
         dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
@@ -131,7 +131,7 @@ class EffectExecutor:
             amount *= 1.0 + dtu
 
         original_amount = amount
-        dot_str = " (DoT)" if damage_type == "dot" else ""
+        source_str = f"[{source_skill}]" if source_skill else hero_tag(caster)
 
         if amount > 0 and target.shield > 0:
             absorbed = min(target.shield, amount)
@@ -139,10 +139,16 @@ class EffectExecutor:
             amount -= absorbed
             target.combat_stats["damage_taken_shield"] += absorbed
             caster.combat_stats["damage_dealt_shield"] += absorbed
-            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}{dot_str}.")
+            if damage_type == "dot":
+                print(f"    {hero_tag(target)} took {original_amount:.0f} DoT damage from {source_str}.")
+            else:
+                print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}.")
             print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
         elif amount > 0:
-            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}{dot_str}.")
+            if damage_type == "dot":
+                print(f"    {hero_tag(target)} took {amount:.0f} DoT damage from {source_str}.")
+            else:
+                print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
 
         if amount > 0:
             target.hp -= amount
@@ -184,7 +190,8 @@ class EffectExecutor:
                     if is_crit:
                         dmg *= ctx.caster.crit_damage
 
-                self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"))
+                source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
+                self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)
                 ctx.damage_dealt += dmg
                 if not effect.params.get("no_counter", False):
                     self.battle.action_damaged_targets.append(target)
@@ -295,6 +302,7 @@ class EffectExecutor:
                     data=data,
                     hooks=hooks,
                     source_name=ctx.caster.name,
+                    source_skill=ctx.metadata.get("source_skill")
                 )
                 target.statuses.append(status)
                 print(f"    {hero_tag(target)} gained status {status_name} ({duration} rounds).")
@@ -560,6 +568,7 @@ class EffectExecutor:
                         }]
                     },
                     source_name=ctx.caster.name,
+                    source_skill=ctx.metadata.get("source_skill")
                 )
                 target.statuses.append(status)
                 print(f"    {hero_tag(target)} gained DoT ({duration} rounds, {amount:.0f} damage/turn).")

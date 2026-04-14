@@ -100,8 +100,10 @@ class BattleEngine:
             for passive in hero.passives:
                 if passive.trigger_event != event_name:
                     continue
+                passive_meta = dict(metadata)
+                passive_meta["source_skill"] = passive.name
                 effects = [Effect(effect.type, **effect.params) for effect in passive.effects]
-                self.executor.execute_list(effects, EffectContext(self, hero, targets, event_name, self.round, metadata))
+                self.executor.execute_list(effects, EffectContext(self, hero, targets, event_name, self.round, passive_meta))
 
         for listener in self.listeners[:]:
             owner = listener["owner"]
@@ -160,7 +162,7 @@ class BattleEngine:
         print(f"    {hero_tag(caster)} cast [{caster.active_skill.name}].")
 
         effects = [Effect(effect.type, **effect.params) for effect in caster.active_skill.effects]
-        self.executor.execute_list(effects, EffectContext(self, caster, [], "skill", self.round, {"overcharge": over}))
+        self.executor.execute_list(effects, EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name}))
         self.emit_event("after_skill", caster, [], {})
         caster.energy = 0
 
