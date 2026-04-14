@@ -5,12 +5,12 @@
       "effects": [
         {
           "type": "damage",
-          "mult": 1.3,
+          "mult": 0.3,
           "target_all_enemies": true
         },
         {
           "type": "damage",
-          "mult": 0.8,
+          "mult": 0.3,
           "target_all_enemies": true
         },
         {
