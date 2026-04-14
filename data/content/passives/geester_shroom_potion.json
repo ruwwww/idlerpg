@@ -9,6 +9,11 @@
           "status": "geester_shroom_passive",
           "duration": 999,
           "target": "self",
+          "data": {
+            "damage_reduction_per_stack": {
+              "shroom_potion": 0.15
+            }
+          },
           "hooks": {
             "on_battle_start": [
               {

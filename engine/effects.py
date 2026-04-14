@@ -111,7 +111,11 @@ class EffectExecutor:
         amount = max(0.0, amount)
 
         dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
-        dr += 0.10 * target.stacks.get("shroom_potion", 0)
+        for status in target.statuses:
+            if "damage_reduction_per_stack" in status.data:
+                for stack_name, dr_val in status.data["damage_reduction_per_stack"].items():
+                    dr += dr_val * target.stacks.get(stack_name, 0)
+        
         if target.shield > 0:
             dr += sum(status.data.get("shield_damage_reduction", 0.0) for status in target.statuses)
         
@@ -127,6 +131,7 @@ class EffectExecutor:
             amount *= 1.0 + dtu
 
         original_amount = amount
+        dot_str = " (DoT)" if damage_type == "dot" else ""
 
         if amount > 0 and target.shield > 0:
             absorbed = min(target.shield, amount)
@@ -134,10 +139,10 @@ class EffectExecutor:
             amount -= absorbed
             target.combat_stats["damage_taken_shield"] += absorbed
             caster.combat_stats["damage_dealt_shield"] += absorbed
-            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}.")
+            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {original_amount:.0f}{' (CRIT)' if is_crit else ''}{dot_str}.")
             print(f"    {hero_tag(target)}'s shield absorbed {absorbed:.0f} damage (Remaining: {target.shield:.0f}).")
         elif amount > 0:
-            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}.")
+            print(f"    {hero_tag(caster)} hit {hero_tag(target)} for {amount:.0f}{' (CRIT)' if is_crit else ''}{dot_str}.")
 
         if amount > 0:
             target.hp -= amount
@@ -517,6 +522,8 @@ class EffectExecutor:
                             "type": "damage",
                             "mult": float(effect.params.get("mult", 0.3)),
                             "target": "owner",
+                            "damage_type": "dot",
+                            "no_crit": True
                         }
                     ]
                 },

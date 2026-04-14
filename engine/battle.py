@@ -79,7 +79,7 @@ class BattleEngine:
         if not name:
             return None
         for hero in self.all_heroes:
-            if hero.name == name and hero.is_alive:
+            if hero.name == name:
                 return hero
         return None
 
