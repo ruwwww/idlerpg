@@ -6,11 +6,11 @@
         {
           "type": "apply_cc",
           "cc_type": "seal_of_light",
-          "duration": 3
+          "duration": 2
         },
         {
           "type": "damage",
-          "mult": 1.2,
+          "mult": 0.5,
           "target_all_enemies": true
         }
       ]

@@ -35,6 +35,7 @@ class HeroDef:
     atk: float
     hp: float
     defense: float
+    basic_skill_id: str | None
     active_skill_id: str | None
     passive_ids: List[str]
 
@@ -187,6 +188,7 @@ class JsonHeroContentSource:
             atk=float(hero_data["atk"]),
             hp=float(hero_data["hp"]),
             defense=float(hero_data["defense"]),
+            basic_skill_id=hero_data.get("basic_attack"),
             active_skill_id=hero_data.get("active_skill"),
             passive_ids=list(hero_data.get("passives", [])),
         )
@@ -217,6 +219,10 @@ class JsonHeroContentSource:
 
     def validate_references(self) -> None:
         for hero in self._heroes.values():
+            if hero.basic_skill_id and hero.basic_skill_id not in self._skills:
+                raise ValueError(
+                    f"Hero '{hero.id}' references unknown skill '{hero.basic_skill_id}'"
+                )
             if hero.active_skill_id and hero.active_skill_id not in self._skills:
                 raise ValueError(
                     f"Hero '{hero.id}' references unknown skill '{hero.active_skill_id}'"

@@ -30,6 +30,16 @@ class HeroRuntimeFactory:
             hero_def.defense,
         )
 
+        if hero_def.basic_skill_id:
+            basic_def = self.source.get_skill(hero_def.basic_skill_id)
+            hero.basic_skill = self.skill_ctor(
+                basic_def.name,
+                [
+                    self.effect_ctor(effect.type, **effect.params)
+                    for effect in basic_def.effects
+                ],
+            )
+
         if hero_def.active_skill_id:
             skill_def = self.source.get_skill(hero_def.active_skill_id)
             hero.active_skill = self.skill_ctor(

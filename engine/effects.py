@@ -244,11 +244,16 @@ class EffectExecutor:
         def h_damage(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             mult = float(effect.params.get("mult", 1.0))
+            mult_per_stack = float(effect.params.get("mult_per_stack", 0.0))
+            mult_stack_name = effect.params.get("mult_stack")
+            if mult_per_stack and isinstance(mult_stack_name, str) and mult_stack_name:
+                mult += ctx.caster.stacks.get(mult_stack_name, 0) * mult_per_stack
             amount_param = effect.params.get("amount")
             no_crit = effect.params.get("no_crit", False)
             for target in targets:
                 if not target or not target.is_alive:
                     continue
+                ctx.metadata.setdefault("event_target", target)
                 if amount_param is not None:
                     if isinstance(amount_param, str) and ctx.status and amount_param.startswith("data."):
                         key = amount_param[5:]

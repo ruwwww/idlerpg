@@ -19,7 +19,7 @@
               {
                 "type": "add_stack",
                 "stack": "shroom_potion",
-                "amount": 2,
+                "amount": 3,
                 "target": "self"
               }
             ],
@@ -64,24 +64,28 @@
                     "target": "self"
                   },
                   {
-                    "type": "add_stack",
-                    "stack": "polymer_essence",
-                    "amount": 1,
-                    "ttl_rounds": 2,
-                    "target": "self"
-                  },
-                  {
                     "type": "conditional",
                     "condition": {
-                      "type": "stack_lte",
-                      "stack": "shroom_potion",
-                      "value": 0
+                      "type": "all",
+                      "conditions": [
+                        {
+                          "type": "stack_lte",
+                          "stack": "shroom_potion",
+                          "value": 0
+                        },
+                        {
+                          "type": "stack_lte",
+                          "stack": "geester_bloom_entry",
+                          "value": 0
+                        }
+                      ]
                     },
                     "then": [
                       {
                         "type": "apply_status",
                         "status": "bloomed",
-                        "duration": 999
+                        "duration": 999,
+                        "target": "self"
                       },
                       {
                         "type": "heal_max_hp_pct",
@@ -91,8 +95,14 @@
                       {
                         "type": "add_stack",
                         "stack": "polymer_essence",
+                        "amount": 2,
+                        "ttl_rounds": 3,
+                        "target": "self"
+                      },
+                      {
+                        "type": "add_stack",
+                        "stack": "geester_bloom_entry",
                         "amount": 1,
-                        "ttl_rounds": 2,
                         "target": "self"
                       }
                     ]

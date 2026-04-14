@@ -91,6 +91,7 @@ class Hero:
 
         self.buffs: List[Buff] = []
         self.passives: List[Passive] = []
+        self.basic_skill: Optional[Skill] = None
         self.active_skill: Optional[Skill] = None
 
         self.stacks: Dict[str, int] = defaultdict(int)

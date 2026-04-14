@@ -99,7 +99,7 @@ class BattleEngine:
         if targets:
             metadata.setdefault("event_target", targets[0])
 
-        if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_create"]:
+        if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create"]:
             trigger_pool = [caster]
         else:
             trigger_pool = [hero for hero in self.all_heroes if hero.is_alive]
@@ -147,16 +147,30 @@ class BattleEngine:
             if not payload.get("persistent", False):
                 caster.behavior.pop("basic_override", None)
         else:
-            target_override = caster.behavior.get("basic_target")
-            if target_override and target_override.get("until_round", -1) >= self.round:
-                target_def = target_override["value"]
+            if caster.basic_skill:
+                effects = [Effect(effect.type, **effect.params) for effect in caster.basic_skill.effects]
+                self.executor.execute_list(
+                    effects,
+                    EffectContext(
+                        self,
+                        caster,
+                        [],
+                        "basic",
+                        self.round,
+                        {"source_skill": caster.basic_skill.name},
+                    ),
+                )
             else:
-                target_def = "lowest_hp_enemy"
+                target_override = caster.behavior.get("basic_target")
+                if target_override and target_override.get("until_round", -1) >= self.round:
+                    target_def = target_override["value"]
+                else:
+                    target_def = "lowest_hp_enemy"
 
-            self.executor.execute_effect(
-                Effect("damage", mult=1.0, target=target_def),
-                EffectContext(self, caster, [], "basic", self.round, {}),
-            )
+                self.executor.execute_effect(
+                    Effect("damage", mult=1.0, target=target_def),
+                    EffectContext(self, caster, [], "basic", self.round, {}),
+                )
 
         basic_targets = list(dict.fromkeys(self.action_damaged_targets))
         basic_meta = {
@@ -180,6 +194,7 @@ class BattleEngine:
 
         effects = [Effect(effect.type, **effect.params) for effect in caster.active_skill.effects]
         self.executor.execute_list(effects, EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name}))
+        self.emit_event("on_active_skill_used", caster, self.action_damaged_targets, {"action_type": "skill", "source_skill": caster.active_skill.name})
         self.emit_event("after_skill", caster, [], {})
         caster.energy = 0
 
