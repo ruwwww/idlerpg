@@ -1,0 +1,32 @@
+{
+  "skills": {
+    "mythos_active": {
+      "name": "Cataclysm Edict",
+      "effects": [
+        {
+          "type": "damage",
+          "mult": 1.0,
+          "target": "all_enemies"
+        },
+        {
+          "type": "damage_target_max_hp_pct",
+          "pct": 0.08,
+          "target": "all_enemies"
+        },
+        {
+          "type": "apply_status",
+          "status": "mythos_rift_scar",
+          "duration": 999,
+          "target": "all_enemies",
+          "tags": ["debuff"],
+          "data": {
+            "modifiers": {
+              "healing_reduction": 0.15,
+              "shield_reduction": 0.15
+            }
+          }
+        }
+      ]
+    }
+  }
+}

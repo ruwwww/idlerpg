@@ -148,7 +148,14 @@ class BattleEngine:
                 EffectContext(self, caster, [], "basic", self.round, {}),
             )
 
-        self.emit_event("on_basic_hit", caster, [], {})
+        basic_targets = list(dict.fromkeys(self.action_damaged_targets))
+        basic_meta = {
+            "event_source": caster,
+            "action_type": "basic",
+        }
+        if basic_targets:
+            basic_meta["event_target"] = basic_targets[0]
+        self.emit_event("on_basic_hit", caster, basic_targets, basic_meta)
         caster.energy = min(999, caster.energy + 50)
 
     def execute_skill(self, caster: Hero):
@@ -221,8 +228,10 @@ class BattleEngine:
 
                 self.action_damaged_targets.clear()
 
+                action_type = "basic"
                 if hero.energy >= 100:
                     self.execute_skill(hero)
+                    action_type = "skill"
                 else:
                     self.execute_basic(hero)
 
@@ -235,6 +244,7 @@ class BattleEngine:
                             {
                                 "event_source": hero,
                                 "event_target": target,
+                                "action_type": action_type,
                             }
                         )
 

@@ -97,14 +97,45 @@ class Hero:
         self.behavior: Dict[str, Any] = {}
         self.modifiers: Dict[str, List[Callable[[float, "Hero", "Hero"], float]]] = defaultdict(list)
 
+    def get_status_modifier(self, key: str) -> float:
+        total = 0.0
+        for status in self.statuses:
+            data = status.data or {}
+
+            direct = data.get(key)
+            if isinstance(direct, (int, float)):
+                total += float(direct)
+
+            modifiers = data.get("modifiers")
+            if isinstance(modifiers, dict):
+                mod_value = modifiers.get(key)
+                if isinstance(mod_value, (int, float)):
+                    total += float(mod_value)
+
+            legacy_per_stack = data.get(f"{key}_per_stack")
+            if isinstance(legacy_per_stack, dict):
+                for stack_name, value in legacy_per_stack.items():
+                    if isinstance(value, (int, float)):
+                        total += float(value) * self.stacks.get(stack_name, 0)
+
+            modifiers_per_stack = data.get("modifiers_per_stack")
+            if isinstance(modifiers_per_stack, dict):
+                stack_map = modifiers_per_stack.get(key)
+                if isinstance(stack_map, dict):
+                    for stack_name, value in stack_map.items():
+                        if isinstance(value, (int, float)):
+                            total += float(value) * self.stacks.get(stack_name, 0)
+
+        return total
+
     def compute_final_atk(self) -> float:
         atk_bonus = sum(b.value for b in self.buffs if b.name == "atk_buff")
-        status_mult = sum(s.data.get("atk_mult", 0.0) for s in self.statuses)
+        status_mult = self.get_status_modifier("atk_mult")
         return self.atk * max(0.0, (1.0 + atk_bonus + status_mult))
 
     def compute_final_speed(self) -> int:
         speed_bonus = int(sum(b.value for b in self.buffs if b.name == "speed_buff"))
-        status_speed = int(sum(s.data.get("speed_delta", 0) for s in self.statuses))
+        status_speed = int(self.get_status_modifier("speed_delta"))
         return max(1, self.speed + speed_bonus + status_speed)
 
     def get_status(self, name: str) -> Optional[Status]:

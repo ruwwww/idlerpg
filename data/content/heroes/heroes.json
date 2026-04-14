@@ -93,6 +93,15 @@
       "basic_attack": "brutus_basic_attack",
       "active_skill": "brutus_active",
       "passives": ["brutus_passive_1", "brutus_passive_2"]
+    },
+    "mythos": {
+      "name": "Mythos",
+      "speed": 1220,
+      "atk": 47000,
+      "hp": 310000,
+      "defense": 12000,
+      "active_skill": "mythos_active",
+      "passives": ["mythos_passive_1", "mythos_passive_2"]
     }
   }
 }

@@ -1,0 +1,28 @@
+{
+  "passives": {
+    "mythos_passive_2": {
+      "name": "Entropy Laceration",
+      "trigger_event": "on_basic_hit",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "mythos_entropy_laceration",
+          "duration": 999,
+          "target": "event_target",
+          "tags": ["debuff"],
+          "data": {
+            "modifiers": {
+              "healing_reduction": 0.1,
+              "shield_reduction": 0.1
+            }
+          }
+        },
+        {
+          "type": "heal_lost_hp_pct",
+          "pct": 0.1,
+          "target": "self"
+        }
+      ]
+    }
+  }
+}

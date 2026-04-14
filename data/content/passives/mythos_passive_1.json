@@ -1,0 +1,64 @@
+{
+  "passives": {
+    "mythos_passive_1": {
+      "name": "Paradox Sigil",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "max_hp",
+          "mult": 1.1,
+          "target": "self"
+        },
+        {
+          "type": "apply_status",
+          "status": "mythos_paradox_sigil",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "atk_mult": 0.1
+            }
+          },
+          "hooks": {
+            "on_target_action_end": [
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "all",
+                  "conditions": [
+                    { "type": "is_event_target", "target": "self" },
+                    { "type": "hp_pct_below", "value": 0.5 },
+                    {
+                      "type": "stack_lte",
+                      "stack": "mythos_last_bastion",
+                      "value": 0
+                    }
+                  ]
+                },
+                "then": [
+                  {
+                    "type": "add_shield",
+                    "max_hp_pct": 0.2,
+                    "target": "self"
+                  },
+                  {
+                    "type": "dispel_all_debuff",
+                    "target": "self"
+                  },
+                  {
+                    "type": "add_stack",
+                    "stack": "mythos_last_bastion",
+                    "amount": 1,
+                    "target": "self"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

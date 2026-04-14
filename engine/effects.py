@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from .models import Effect, EffectContext, Hero, Status
 from .utils import hero_tag
@@ -95,6 +95,10 @@ class EffectExecutor:
             meta_target = ctx.metadata.get("event_target")
             return meta_target is not None and meta_target == target
 
+        if ctype == "is_event_source":
+            meta_source = ctx.metadata.get("event_source")
+            return meta_source is not None and meta_source == target
+
         if ctype == "event_metadata_match":
             key = condition.get("key")
             expected = condition.get("value")
@@ -107,28 +111,38 @@ class EffectExecutor:
 
         return False
 
+    def _apply_heal_scaling(self, amount: float, target: Hero) -> float:
+        heal_up = target.get_status_modifier("healing_received_mult") + target.get_status_modifier("heal_received_mult")
+        heal_down = target.get_status_modifier("healing_reduction") + target.get_status_modifier("heal_reduction")
+        return amount * max(0.0, 1.0 + heal_up - heal_down)
+
+    def _apply_shield_scaling(self, amount: float, target: Hero) -> float:
+        shield_up = target.get_status_modifier("shield_received_mult") + target.get_status_modifier("shielding_received_mult")
+        shield_down = target.get_status_modifier("shield_reduction") + target.get_status_modifier("shielding_reduction")
+        return amount * max(0.0, 1.0 + shield_up - shield_down)
+
     def _apply_damage(self, target: Hero, amount: float, caster: Hero, is_crit: bool, damage_type: str = "physical", source_skill: Optional[str] = None):
         amount = max(0.0, amount)
 
-        dr = sum(status.data.get("damage_reduction", 0.0) for status in target.statuses)
-        for status in target.statuses:
-            if "damage_reduction_per_stack" in status.data:
-                for stack_name, dr_val in status.data["damage_reduction_per_stack"].items():
-                    dr += dr_val * target.stacks.get(stack_name, 0)
-        
+        dr = target.get_status_modifier("damage_reduction")
         if target.shield > 0:
-            dr += sum(status.data.get("shield_damage_reduction", 0.0) for status in target.statuses)
-        
+            dr += target.get_status_modifier("shield_damage_reduction")
+
         if dr > 0:
             amount *= max(0.0, 1.0 - dr)
 
         if damage_type == "dot":
-            dot_dr = sum(status.data.get("dot_damage_reduction", 0.0) for status in target.statuses)
-            amount *= max(0.0, 1.0 - dot_dr)
+            dot_dr = target.get_status_modifier("dot_damage_reduction")
+            if dot_dr > 0:
+                amount *= max(0.0, 1.0 - dot_dr)
 
-        dtu = sum(status.data.get("damage_taken_up", 0.0) for status in target.statuses)
-        if dtu > 0:
-            amount *= 1.0 + dtu
+        damage_taken_down = target.get_status_modifier("damage_taken_down")
+        if damage_taken_down > 0:
+            amount *= max(0.0, 1.0 - damage_taken_down)
+
+        damage_taken_up = target.get_status_modifier("damage_taken_up")
+        if damage_taken_up > 0:
+            amount *= 1.0 + damage_taken_up
 
         original_amount = amount
         source_str = f"[{source_skill}]" if source_skill else hero_tag(caster)
@@ -215,16 +229,56 @@ class EffectExecutor:
                     ctx.caster.shield = min(ctx.caster.max_shield, ctx.caster.shield + gain)
                     print(f"    {hero_tag(ctx.caster)} gained {ctx.caster.shield - old:.0f} shield.")
 
+        def h_damage_target_max_hp_pct(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+
+                dmg = target.max_hp * pct
+                source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
+                self._apply_damage(
+                    target,
+                    dmg,
+                    ctx.caster,
+                    False,
+                    damage_type=effect.params.get("damage_type", "physical"),
+                    source_skill=source_skill,
+                )
+                ctx.damage_dealt += dmg
+
+                if not effect.params.get("no_counter", False):
+                    self.battle.action_damaged_targets.append(target)
+                    self.battle.emit_event(
+                        "on_receive_damage",
+                        ctx.caster,
+                        [target],
+                        {
+                            "target": target,
+                            "damage": dmg,
+                            "damage_type": effect.params.get("damage_type", "physical"),
+                            "event_source": ctx.caster,
+                            "event_target": target,
+                        },
+                    )
+
         def h_heal(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             mult = float(effect.params.get("mult", 1.0))
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                amount = ctx.caster.compute_final_atk() * mult
+                amount = self._apply_heal_scaling(ctx.caster.compute_final_atk() * mult, target)
+                if amount <= 0:
+                    continue
+                before = target.hp
                 target.hp = min(target.max_hp, target.hp + amount)
-                ctx.caster.combat_stats["healing_done"] += amount
-                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f}.")
+                recovered = target.hp - before
+                if recovered <= 0:
+                    continue
+                ctx.caster.combat_stats["healing_done"] += recovered
+                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f}.")
 
         def h_modify_stat(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -281,7 +335,7 @@ class EffectExecutor:
                     continue
 
                 incoming_is_cc = "cc" in tags
-                cc_immunity_pct = sum(status.data.get("cc_immunity_chance", 0.0) for status in target.statuses)
+                cc_immunity_pct = target.get_status_modifier("cc_immunity_chance")
                 if incoming_is_cc and random.random() < cc_immunity_pct:
                     print(f"    {hero_tag(target)} blocked {status_name} with CC Immunity.")
                     continue
@@ -381,10 +435,15 @@ class EffectExecutor:
                     amount += ctx.caster.compute_final_atk() * mult
                 if max_hp_pct > 0:
                     amount += ctx.caster.max_hp * max_hp_pct
+                amount = self._apply_shield_scaling(amount, target)
                 if amount > 0:
+                    before = target.shield
                     target.shield = min(target.max_shield, target.shield + amount)
-                    ctx.caster.combat_stats["shielding_done"] += amount
-                    print(f"    {hero_tag(target)} gained {amount:.0f} shield (Total: {target.shield:.0f}).")
+                    gained = target.shield - before
+                    if gained <= 0:
+                        continue
+                    ctx.caster.combat_stats["shielding_done"] += gained
+                    print(f"    {hero_tag(target)} gained {gained:.0f} shield (Total: {target.shield:.0f}).")
 
         self.handlers["add_shield"] = h_add_shield
 
@@ -457,16 +516,52 @@ class EffectExecutor:
 
         self.handlers["dispel_random_debuff"] = h_dispel_random_debuff
 
+        def h_dispel_all_debuff(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            for target in targets:
+                debuff_count = sum(1 for status in target.statuses if "debuff" in status.tags)
+                if debuff_count <= 0:
+                    print(f"    {hero_tag(target)} has no debuffs to dispel.")
+                    continue
+                target.statuses = [status for status in target.statuses if "debuff" not in status.tags]
+                print(f"    {hero_tag(target)} dispelled {debuff_count} debuff(s).")
+
+        self.handlers["dispel_all_debuff"] = h_dispel_all_debuff
+
         def h_heal_max_hp_pct(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             pct = float(effect.params.get("pct", 0.0))
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                amount = target.max_hp * pct
+                amount = self._apply_heal_scaling(target.max_hp * pct, target)
+                if amount <= 0:
+                    continue
+                before = target.hp
                 target.hp = min(target.max_hp, target.hp + amount)
-                ctx.caster.combat_stats["healing_done"] += amount
-                print(f"    {hero_tag(target)} recovered {amount:.0f} HP ({pct*100:.0f}% max HP).")
+                recovered = target.hp - before
+                if recovered <= 0:
+                    continue
+                ctx.caster.combat_stats["healing_done"] += recovered
+                print(f"    {hero_tag(target)} recovered {recovered:.0f} HP ({pct*100:.0f}% max HP).")
+
+        def h_heal_lost_hp_pct(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.0))
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+                lost_hp = max(0.0, target.max_hp - target.hp)
+                amount = self._apply_heal_scaling(lost_hp * pct, target)
+                if amount <= 0:
+                    continue
+                before = target.hp
+                target.hp = min(target.max_hp, target.hp + amount)
+                recovered = target.hp - before
+                if recovered <= 0:
+                    continue
+                ctx.caster.combat_stats["healing_done"] += recovered
+                print(f"    {hero_tag(target)} recovered {recovered:.0f} HP ({pct*100:.0f}% lost HP).")
 
         def h_random_choice(effect: Effect, ctx: EffectContext):
             choices = effect.params.get("choices", [])
@@ -510,9 +605,16 @@ class EffectExecutor:
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                target.hp = min(target.max_hp, target.hp + amount)
-                ctx.caster.combat_stats["healing_done"] += amount
-                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {amount:.0f} HP ({pct*100:.0f}% of damage dealt).")
+                scaled = self._apply_heal_scaling(amount, target)
+                if scaled <= 0:
+                    continue
+                before = target.hp
+                target.hp = min(target.max_hp, target.hp + scaled)
+                recovered = target.hp - before
+                if recovered <= 0:
+                    continue
+                ctx.caster.combat_stats["healing_done"] += recovered
+                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f} HP ({pct*100:.0f}% of damage dealt).")
 
         self.handlers["heal_percent_damage_dealt"] = h_heal_percent_damage_dealt
 
@@ -545,7 +647,7 @@ class EffectExecutor:
             pct = float(effect.params.get("pct", 0.5))
             duration = int(effect.params.get("duration", 2))
             status_name = effect.params.get("status", "dot")
-            dot_mult = 1.0 + sum(status.data.get("dot_damage_mult", 0.0) for status in ctx.caster.statuses)
+            dot_mult = 1.0 + ctx.caster.get_status_modifier("dot_damage_mult")
             amount = ctx.damage_dealt * pct * dot_mult
             for target in targets:
                 if not target or not target.is_alive:
@@ -663,6 +765,7 @@ class EffectExecutor:
                 )
 
         self.register("damage", h_damage)
+        self.register("damage_target_max_hp_pct", h_damage_target_max_hp_pct)
         self.register("heal", h_heal)
         self.register("apply_status", h_apply_status)
         self.register("remove_status", h_remove_status)
@@ -674,6 +777,7 @@ class EffectExecutor:
         self.register("conditional", h_conditional)
         self.register("repeat", h_repeat)
         self.register("heal_max_hp_pct", h_heal_max_hp_pct)
+        self.register("heal_lost_hp_pct", h_heal_lost_hp_pct)
         self.register("random_choice", h_random_choice)
         self.register("trigger_event", h_trigger_event)
         self.register("listen_event", h_listen_event)
