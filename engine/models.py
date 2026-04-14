@@ -74,7 +74,7 @@ class Hero:
         self.defense = defense
         self.crit_chance = 0.0
         self.crit_damage = 1.5
-        self.energy = 0.0
+        self.energy = 50.0
         self.is_alive = True
         self.team = None
 
