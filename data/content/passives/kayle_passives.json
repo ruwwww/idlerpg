@@ -1,0 +1,99 @@
+{
+  "passives": {
+    "kayle_rangers_focus": {
+      "name": "Ranger's Focus",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "add_combat_stat",
+          "stat": "skill_damage_mult",
+          "value": 0.3,
+          "target": "self",
+          "duration": 9999
+        },
+        {
+          "type": "add_combat_stat",
+          "stat": "block_add",
+          "value": 15.0,
+          "target": "self",
+          "duration": 9999
+        },
+        {
+          "type": "add_combat_stat",
+          "stat": "atk_mult",
+          "value": 0.1,
+          "target": "self",
+          "duration": 9999
+        }
+      ]
+    },
+
+    "kayle_counter_mark": {
+      "name": "Counter Mark",
+      "trigger_event": "on_block",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "vulnerability",
+          "duration": 2,
+          "target": "event_source",
+          "tags": ["debuff"],
+          "data": { "modifiers": { "damage_taken_up": 0.08 } }
+        },
+        {
+          "type": "atk_steal",
+          "pct": 20.0,
+          "target": "event_source",
+          "duration": 2
+        },
+        {
+          "type": "add_combat_stat",
+          "stat": "precision_add",
+          "value": -10.0,
+          "target": "event_source",
+          "duration": 3
+        }
+      ]
+    },
+
+    "kayle_overdrive": {
+      "name": "Overdrive",
+      "trigger_event": "on_energy_full",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "status_not_exists",
+            "status": "overdrive_primed",
+            "target": "self"
+          },
+          "then": [
+            {
+              "type": "apply_status",
+              "status": "overdrive_primed",
+              "duration": 1,
+              "target": "self",
+              "tags": [],
+              "data": {}
+            },
+            {
+              "type": "repeat",
+              "times": 3,
+              "effects": [
+                {
+                  "type": "damage",
+                  "target": {
+                    "selector": "random_marked_enemy_priority",
+                    "status": "vulnerability"
+                  },
+                  "mult": 0.75,
+                  "true_damage_if_status": "vulnerability"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -120,6 +120,18 @@
       "defense": 9000,
       "active_skill": "aether_active",
       "passives": ["aether_passive_1", "aether_passive_2", "aether_passive_3"]
+    },
+    "kayle": {
+      "name": "Kayle",
+      "speed": 1380,
+      "atk": 58000,
+      "hp": 215000,
+      "defense": 7000,
+      "block": 5.0,
+      "precision": 10.0,
+      "basic_attack": "kayle_basic",
+      "active_skill": "kayle_active",
+      "passives": ["kayle_rangers_focus", "kayle_counter_mark", "kayle_overdrive"]
     }
   }
 }

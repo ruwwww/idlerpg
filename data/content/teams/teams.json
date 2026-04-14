@@ -1,9 +1,10 @@
 {
   "teams": {
-    "team1_default": ["selena", "brutus", "angela", "aether", "fredrin"],
+    "team1_default": ["kayle", "selena", "brutus", "angela", "fredrin"],
     "team2_default": ["argus", "angela", "brutus", "galatea"],
     "team1_mythos_demo": ["brutus"],
     "team1_rexus_demo": ["rexus", "fredrin", "selena", "geester", "mareia"],
-    "team1_aether_demo": ["mythos", "argus", "rexus", "tara", "geester"]
+    "team1_aether_demo": ["mythos", "argus", "rexus", "tara", "geester"],
+    "kayle_demo": ["kayle", "fredrin", "aether", "angela", "selena"]
   }
 }

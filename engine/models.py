@@ -181,7 +181,8 @@ class Hero:
     def compute_final_atk(self) -> float:
         atk_bonus = sum(b.value for b in self.buffs if b.name == "atk_buff")
         status_mult = self.get_status_modifier("atk_mult")
-        return self.atk * max(0.0, (1.0 + atk_bonus + status_mult))
+        flat_add = self.get_status_modifier("atk_flat_add")   # e.g. from ATK steal
+        return self.atk * max(0.0, (1.0 + atk_bonus + status_mult)) + flat_add
 
     def compute_final_defense(self) -> float:
         """Effective armor value after status modifiers (before Armor Break)."""

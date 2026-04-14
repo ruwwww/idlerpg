@@ -103,6 +103,9 @@ class EffectExecutor:
         if ctype == "status_exists":
             return target.get_status(condition.get("status", "")) is not None
 
+        if ctype == "status_not_exists":
+            return target.get_status(condition.get("status", "")) is None
+
         if ctype == "is_event_target":
             meta_target = ctx.metadata.get("event_target")
             return meta_target is not None and meta_target == target
@@ -149,6 +152,14 @@ class EffectExecutor:
             expected = condition.get("value")
             return ctx.metadata.get(key) != expected
 
+        if ctype == "stat_gte":
+            # Checks if a numeric attribute on the target is >= value.
+            # e.g. {"type": "stat_gte", "stat": "energy", "value": 100, "target": "self"}
+            stat_name = condition.get("stat", "energy")
+            threshold = float(condition.get("value", 0))
+            actual = float(getattr(target, stat_name, 0))
+            return actual >= threshold
+
         return False
 
     def _apply_heal_scaling(self, amount: float, target: Hero) -> float:
@@ -182,14 +193,21 @@ class EffectExecutor:
         source_skill: Optional[str] = None,
         armor_break_pct: float = 0.0,
         ignore_armor: bool = False,
+        ignore_all_dr: bool = False,
     ) -> float:
+        """
+        ignore_all_dr=True  → bypasses armor DR, block, and ALL status-based reductions
+                              (but not damage_taken_up — amplification always applies).
+        ignore_armor=True   → bypasses only armor DR and block (used for holy damage).
+        """
         amount = max(0.0, amount)
         shield_dealt = 0.0
         hp_dealt = 0.0
 
         # ── ARMOR DR ────────────────────────────────────────────────────────────
         # Applied to physical hits only. Holy / dot / true / ignore_armor bypass.
-        _armor_bypass = ignore_armor or damage_type in ("dot", "true", "holy")
+        # ignore_all_dr also bypasses everything (used for vulnerability true damage).
+        _armor_bypass = ignore_all_dr or ignore_armor or damage_type in ("dot", "true", "holy")
         if not _armor_bypass and amount > 0:
             # Armor break from: effect param + caster's penetration buffs + debuff on target
             total_armor_break = min(
@@ -225,51 +243,58 @@ class EffectExecutor:
                     {"event_source": caster, "event_target": target},
                 )
 
-        # ── EXISTING STATUS-BASED REDUCTIONS ────────────────────────────────────
+        # ── STATUS-BASED REDUCTIONS (skipped when ignore_all_dr=True) ──────────
+        # ignore_all_dr bypasses mitigation (armor, block, reductions).
+        # Amplification (damage_taken_up) still applies regardless.
         taunt_dr = 0.0
-        taunted_attacker = False
-        for status in caster.statuses:
-            if not status.data.get("force_target_source", False):
-                continue
-            if status.source_name != target.name:
-                continue
-            taunted_attacker = True
-            value = status.data.get("damage_reduction_vs_taunter")
-            if value is None:
-                value = status.data.get("taunt_damage_reduction_pct", 0.0)
-            if isinstance(value, (int, float)):
-                taunt_dr = max(taunt_dr, float(value))
-
         taunted_enemy_dr = 0.0
-        if taunted_attacker:
-            taunted_enemy_dr += target.get_status_modifier("damage_reduction_from_taunted_enemies")
-            taunted_enemy_dr += target.get_status_modifier("damage_reduction_vs_taunted_enemy")
+        taunted_attacker = False
+        if not ignore_all_dr:
+            for status in caster.statuses:
+                if not status.data.get("force_target_source", False):
+                    continue
+                if status.source_name != target.name:
+                    continue
+                taunted_attacker = True
+                value = status.data.get("damage_reduction_vs_taunter")
+                if value is None:
+                    value = status.data.get("taunt_damage_reduction_pct", 0.0)
+                if isinstance(value, (int, float)):
+                    taunt_dr = max(taunt_dr, float(value))
 
-        dr = target.get_status_modifier("damage_reduction")
-        if taunt_dr > 0:
-            dr += taunt_dr
-        if taunted_enemy_dr > 0:
-            dr += taunted_enemy_dr
-        if target.has_status_tag("cc"):
-            dr += target.get_status_modifier("damage_reduction_while_cc")
-        if target.shield > 0:
-            dr += target.get_status_modifier("shield_damage_reduction")
+            if taunted_attacker:
+                taunted_enemy_dr += target.get_status_modifier("damage_reduction_from_taunted_enemies")
+                taunted_enemy_dr += target.get_status_modifier("damage_reduction_vs_taunted_enemy")
 
-        if dr > 0:
-            amount *= max(0.0, 1.0 - dr)
+            dr = target.get_status_modifier("damage_reduction")
+            if taunt_dr > 0:
+                dr += taunt_dr
+            if taunted_enemy_dr > 0:
+                dr += taunted_enemy_dr
+            if target.has_status_tag("cc"):
+                dr += target.get_status_modifier("damage_reduction_while_cc")
+            if target.shield > 0:
+                dr += target.get_status_modifier("shield_damage_reduction")
 
-        if damage_type == "dot":
-            dot_dr = target.get_status_modifier("dot_damage_reduction")
-            if dot_dr > 0:
-                amount *= max(0.0, 1.0 - dot_dr)
+            if dr > 0:
+                amount *= max(0.0, 1.0 - dr)
 
-        damage_taken_down = target.get_status_modifier("damage_taken_down")
-        if damage_taken_down > 0:
-            amount *= max(0.0, 1.0 - damage_taken_down)
+            if damage_type == "dot":
+                dot_dr = target.get_status_modifier("dot_damage_reduction")
+                if dot_dr > 0:
+                    amount *= max(0.0, 1.0 - dot_dr)
 
+            damage_taken_down = target.get_status_modifier("damage_taken_down")
+            if damage_taken_down > 0:
+                amount *= max(0.0, 1.0 - damage_taken_down)
+
+        # Amplification always applies (vulnerability's 8% extra, etc).
         damage_taken_up = target.get_status_modifier("damage_taken_up")
         if damage_taken_up > 0:
             amount *= 1.0 + damage_taken_up
+
+        if ignore_all_dr and amount > 0:
+            print(f"    [TRUE] {hero_tag(caster)} pierces all defenses of {hero_tag(target)}!")
 
         original_amount = amount
         source_str = f"[{source_skill}]" if source_skill else hero_tag(caster)
@@ -329,7 +354,11 @@ class EffectExecutor:
                 print(f"    {hero_tag(target)} has been defeated.")
                 self.battle.emit_event("on_death", caster, [target], {"dead": target, "event_source": caster, "event_target": target})
 
-        target.energy = min(999, target.energy + (20 if is_crit else 10))
+        energy_gain = 20.0 if is_crit else 10.0
+        prev_energy = target.energy
+        target.energy = min(999, target.energy + energy_gain)
+        # Emit on_energy_full when target crosses the 100-energy threshold.
+        self.battle._emit_energy_full_if_crossed(caster, target, prev_energy, attempted_gain=energy_gain)
         return shield_dealt + hp_dealt
 
 
@@ -399,12 +428,18 @@ class EffectExecutor:
                     print(f"    {hero_tag(ctx.caster)} is taunted and is forced to target {hero_tag(target)}.")
                     ctx.metadata["taunt_forced_logged"] = True
 
-                # Normal hit (with Armor DR + Block).
+                # ── TRUE DAMAGE CONDITION ──────────────────────────────────────
+                # If the target has the specified status, bypass ALL mitigation.
+                true_status = effect.params.get("true_damage_if_status")
+                ignore_all = bool(true_status and target.get_status(true_status))
+
+                # Normal hit (with Armor DR + Block, or true damage if condition met).
                 dealt_actual = self._apply_damage(
                     target, dmg, ctx.caster, is_crit,
                     damage_type=effect.params.get("damage_type", "physical"),
                     source_skill=source_skill,
                     armor_break_pct=armor_break,
+                    ignore_all_dr=ignore_all,
                 )
 
                 # Holy hit (ignores armor, ignores block, no crit).
@@ -519,6 +554,7 @@ class EffectExecutor:
             add = effect.params.get("add")
             mult = effect.params.get("mult")
             for target in targets:
+                prev_energy = target.energy if stat_type == "energy" else None
                 if stat_type == "max_hp":
                     if mult is not None:
                         current_pct = target.hp / max(1.0, target.max_hp)
@@ -534,12 +570,21 @@ class EffectExecutor:
                     current *= float(mult)
                 if add is not None:
                     current += float(add)
+                requested_current = float(current)
                 if stat_type == "energy":
                     current = min(999, max(0, current))
                 if stat_type == "hp":
                     current = min(target.max_hp, max(0, current))
                 setattr(target, stat_type, current)
                 print(f"    {hero_tag(target)} {stat_type} is now {current}.")
+                if stat_type == "energy" and prev_energy is not None:
+                    attempted_gain = max(0.0, requested_current - float(prev_energy))
+                    self.battle._emit_energy_full_if_crossed(
+                        ctx.caster,
+                        target,
+                        float(prev_energy),
+                        attempted_gain=attempted_gain,
+                    )
 
         def h_apply_status(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -1201,4 +1246,59 @@ class EffectExecutor:
         self.register("armor_break", h_armor_break)
         self.register("holy_damage", h_holy_damage)
         self.register("add_combat_stat", h_add_combat_stat)
+
+        # ── ATK STEAL ────────────────────────────────────────────────────────────
+        def h_atk_steal(effect: Effect, ctx: EffectContext):
+            """Steal pct% of each target's base ATK.
+
+            - Applies `atk_mult = -(pct/100)` debuff on target for `duration` rounds.
+            - Applies a flat `atk_flat_add` buff on the caster for the same duration.
+              Each steal event creates its own status so multiple steals stack correctly;
+              get_status_modifier() sums all `atk_flat_add` values automatically.
+            """
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", 0.0))
+            duration = int(effect.params.get("duration", 2))
+            ratio = pct / 100.0
+
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+
+                steal_amount = target.atk * ratio  # flat ATK stolen (from base stat)
+
+                # ── Debuff: reduce target ATK by pct% of their base ──
+                debuff_name = "atk_stolen"
+                existing_debuff = target.get_status(debuff_name)
+                if existing_debuff:
+                    existing_debuff.duration = max(existing_debuff.duration, duration)
+                    mods = existing_debuff.data.setdefault("modifiers", {})
+                    mods["atk_mult"] = mods.get("atk_mult", 0.0) - ratio
+                else:
+                    target.statuses.append(
+                        Status(
+                            name=debuff_name,
+                            duration=duration,
+                            tags=["debuff"],
+                            data={"modifiers": {"atk_mult": -ratio}},
+                            source_name=ctx.caster.name,
+                            source_skill=ctx.metadata.get("source_skill"),
+                        )
+                    )
+                print(f"    {hero_tag(target)} ATK reduced by {pct:.0f}% ({steal_amount:.0f} stolen).")
+
+                # ── Buff: grant caster flat ATK (new status per steal so they stack) ──
+                ctx.caster.statuses.append(
+                    Status(
+                        name="stolen_atk",
+                        duration=duration,
+                        tags=["buff"],
+                        data={"modifiers": {"atk_flat_add": steal_amount}},
+                        source_name=ctx.caster.name,
+                        source_skill=ctx.metadata.get("source_skill"),
+                    )
+                )
+                print(f"    {hero_tag(ctx.caster)} gained +{steal_amount:.0f} flat ATK from {hero_tag(target)}.")
+
+        self.register("atk_steal", h_atk_steal)
 

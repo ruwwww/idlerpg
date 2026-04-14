@@ -93,6 +93,38 @@ class BattleEngine:
                 return hero
         return None
 
+    def _emit_energy_full_if_crossed(
+        self,
+        event_caster: Hero,
+        hero: Hero,
+        prev_energy: float,
+        attempted_gain: float = 0.0,
+    ):
+        """Emit on_energy_full when an energy gain happens at/above 100, at most once per round.
+
+        This supports both threshold crossing (e.g. 90 -> 110) and additional gain while
+        already full/overcharged (e.g. 100 -> 130 or overflow into cap).
+        """
+        if hero.energy < 100:
+            return
+
+        gain_event_happened = prev_energy < 100 or hero.energy > prev_energy or attempted_gain > 0
+        if not gain_event_happened:
+            return
+
+        last_round = int(hero.behavior.get("_energy_full_emitted_round", -1))
+        if last_round == self.round:
+            return
+
+        hero.behavior["_energy_full_emitted_round"] = self.round
+        print(f"    {hero_tag(hero)} energy is now {hero.energy:.1f}.")
+        self.emit_event(
+            "on_energy_full",
+            event_caster,
+            [hero],
+            {"event_source": event_caster, "event_target": hero},
+        )
+
     def emit_event(self, event_name: str, caster: Hero, targets: List[Hero], metadata: Optional[Dict[str, Any]] = None):
         metadata = dict(metadata or {})
         metadata.setdefault("event_source", caster)
@@ -101,8 +133,8 @@ class BattleEngine:
 
         if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create"]:
             trigger_pool = [caster]
-        elif event_name == "on_block":
-            # on_block passives belong to the blocking hero (targets[0] = the defender)
+        elif event_name in ["on_block", "on_energy_full"]:
+            # on_block/on_energy_full passives belong to the affected hero (targets[0]).
             trigger_pool = [targets[0]] if targets else []
         elif event_name == "on_death":
             trigger_pool = list(self.all_heroes)
@@ -193,7 +225,9 @@ class BattleEngine:
         if basic_targets:
             basic_meta["event_target"] = basic_targets[0]
         self.emit_event("on_basic_hit", caster, basic_targets, basic_meta)
+        prev_energy = caster.energy
         caster.energy = min(999, caster.energy + 50)
+        self._emit_energy_full_if_crossed(caster, caster, prev_energy, attempted_gain=50.0)
 
     def execute_skill(self, caster: Hero):
         if not caster.active_skill:

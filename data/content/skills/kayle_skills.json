@@ -1,0 +1,80 @@
+{
+  "skills": {
+    "kayle_basic": {
+      "name": "Hunter's Protocol",
+      "effects": [
+        {
+          "type": "with_target",
+          "target": { "selector": "highest_atk_enemies", "n": 1 },
+          "effects": [
+            {
+              "type": "repeat",
+              "times": 2,
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.85,
+                  "target": "event_target"
+                },
+                {
+                  "type": "conditional",
+                  "condition": { "type": "random_chance", "chance": 0.25 },
+                  "then": [
+                    {
+                      "type": "apply_status",
+                      "status": "vulnerability",
+                      "duration": 2,
+                      "target": "event_target",
+                      "tags": ["debuff"],
+                      "data": { "modifiers": { "damage_taken_up": 0.08 } }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "atk_steal",
+              "pct": 30.0,
+              "target": "event_target",
+              "duration": 2
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "block_add",
+              "value": 10.0,
+              "target": "self",
+              "duration": 2
+            }
+          ]
+        }
+      ]
+    },
+
+    "kayle_active": {
+      "name": "Eternal Hunt",
+      "effects": [
+        {
+          "type": "repeat",
+          "times": 6,
+          "effects": [
+            {
+              "type": "with_target",
+              "target": {
+                "selector": "random_marked_enemy_priority",
+                "status": "vulnerability"
+              },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.75,
+                  "target": "event_target",
+                  "true_damage_if_status": "vulnerability"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

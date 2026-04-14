@@ -170,5 +170,17 @@ class TargetResolver:
             out.extend(top_others)
             return out
 
+        if selector == "random_marked_enemy_priority":
+            # Picks randomly from marked enemies (preferred); falls back to random enemy.
+            # target_def["status"] names the mark to look for (default "vulnerability").
+            if taunt_target:
+                self._mark_taunt_forced(ctx, taunt_target)
+                return [taunt_target]
+            mark = target_def.get("status", "vulnerability")
+            marked = [e for e in enemies if e.get_status(mark)]
+            if marked:
+                return [random.choice(marked)]
+            return [random.choice(enemies)] if enemies else []
+
         default = battle.pick_default_target(caster)
         return [default] if default else []
