@@ -1,0 +1,71 @@
+{
+  "passives": {
+    "rexus_passive_3": {
+      "name": "Crown of Ruin",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "rexus_crown_aura",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "atk_mult": 0.1
+            }
+          }
+        },
+        {
+          "type": "listen_event",
+          "event": "on_ally_receive_cc",
+          "duration": 999,
+          "effects": [
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "stack_lte",
+                "target": "self",
+                "stack": "rexus_cc_surge_count",
+                "value": 2
+              },
+              "then": [
+                {
+                  "type": "add_stack",
+                  "stack": "rexus_cc_surge_count",
+                  "amount": 1,
+                  "target": "self"
+                },
+                {
+                  "type": "modify_stat",
+                  "stat_type": "energy",
+                  "add": 10,
+                  "target": "self"
+                },
+                {
+                  "type": "modify_stat",
+                  "stat_type": "speed",
+                  "add": 10,
+                  "target": "self"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listen_event",
+          "event": "round_end",
+          "duration": 999,
+          "effects": [
+            {
+              "type": "set_stack",
+              "stack": "rexus_cc_surge_count",
+              "value": 0,
+              "target": "self"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

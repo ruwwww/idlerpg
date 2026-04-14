@@ -43,6 +43,13 @@ class TargetResolver:
             return allies
         if selector == "random_enemies":
             return random.sample(enemies, min(n, len(enemies))) if enemies else []
+        if selector == "random_other_enemies":
+            excluded = set(ctx.targets or [])
+            event_target = ctx.metadata.get("event_target")
+            if event_target:
+                excluded.add(event_target)
+            pool = [h for h in enemies if h not in excluded]
+            return random.sample(pool, min(n, len(pool))) if pool else []
         if selector == "random_allies":
             pool = [h for h in allies if h != caster] or allies
             return random.sample(pool, min(n, len(pool))) if pool else []

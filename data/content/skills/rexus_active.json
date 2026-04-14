@@ -1,0 +1,60 @@
+{
+  "skills": {
+    "rexus_active": {
+      "name": "Sovereign Verdict",
+      "effects": [
+        {
+          "type": "with_target",
+          "target": { "selector": "random_enemies", "n": 1 },
+          "effects": [
+            {
+              "type": "damage",
+              "mult": 1.2,
+              "target": "event_target"
+            },
+            {
+              "type": "conditional",
+              "condition": { "type": "is_event_target_dead" },
+              "then": [
+                {
+                  "type": "damage",
+                  "mult": 0.9,
+                  "target": "all_enemies",
+                  "crit_chance_bonus": 1.0
+                }
+              ],
+              "else": [
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "hp_pct_below",
+                    "target": "event_target",
+                    "value": 0.6
+                  },
+                  "then": [
+                    {
+                      "type": "damage",
+                      "mult": 0.9,
+                      "target": "event_target"
+                    },
+                    {
+                      "type": "with_target",
+                      "target": { "selector": "random_other_enemies", "n": 1 },
+                      "effects": [
+                        {
+                          "type": "damage",
+                          "mult": 0.9,
+                          "target": "event_target"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

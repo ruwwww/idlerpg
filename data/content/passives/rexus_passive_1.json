@@ -1,0 +1,71 @@
+{
+  "passives": {
+    "rexus_passive_1": {
+      "name": "Imperial Predator",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "modify_stat",
+          "stat_type": "max_hp",
+          "mult": 1.1,
+          "target": "self"
+        },
+        {
+          "type": "apply_status",
+          "status": "rexus_predator_core",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "data": {
+            "modifiers": {
+              "crit_chance_add": 0.1,
+              "crit_damage_mult": 0.2
+            }
+          }
+        },
+        {
+          "type": "modify_behavior",
+          "behavior": "basic_target",
+          "value": { "selector": "random_enemies", "n": 1 },
+          "duration": 999,
+          "target": "self"
+        },
+        {
+          "type": "listen_event",
+          "event": "on_basic_hit",
+          "duration": 999,
+          "effects": [
+            {
+              "type": "conditional",
+              "condition": {
+                "type": "is_event_source",
+                "target": "self"
+              },
+              "then": [
+                {
+                  "type": "modify_stat",
+                  "stat_type": "energy",
+                  "add": -30,
+                  "target": "event_target"
+                },
+                {
+                  "type": "apply_status",
+                  "status": "rexus_ravenous_flow",
+                  "duration": 2,
+                  "target": "self",
+                  "tags": ["buff"],
+                  "data": {
+                    "modifiers": {
+                      "atk_mult": 0.2,
+                      "crit_damage_mult": 0.15
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

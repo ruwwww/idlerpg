@@ -89,7 +89,7 @@ class BattleEngine:
         if targets:
             metadata.setdefault("event_target", targets[0])
 
-        if event_name in ["turn_start", "turn_end", "after_skill", "after_action", "on_basic_hit", "on_create"]:
+        if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_create"]:
             trigger_pool = [caster]
         else:
             trigger_pool = [hero for hero in self.all_heroes if hero.is_alive]

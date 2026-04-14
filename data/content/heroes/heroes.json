@@ -102,6 +102,15 @@
       "defense": 12000,
       "active_skill": "mythos_active",
       "passives": ["mythos_passive_1", "mythos_passive_2"]
+    },
+    "rexus": {
+      "name": "Rexus",
+      "speed": 1200,
+      "atk": 50000,
+      "hp": 330000,
+      "defense": 11000,
+      "active_skill": "rexus_active",
+      "passives": ["rexus_passive_1", "rexus_passive_2", "rexus_passive_3"]
     }
   }
 }

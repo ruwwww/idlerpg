@@ -1,0 +1,52 @@
+{
+  "passives": {
+    "rexus_passive_2": {
+      "name": "Throne Reflex",
+      "trigger_event": "after_skill",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "is_event_source_enemy",
+            "target": "self"
+          },
+          "then": [
+            {
+              "type": "apply_status",
+              "status": "rexus_bulwark_instinct",
+              "duration": 2,
+              "target": "self",
+              "tags": ["buff"],
+              "data": {
+                "modifiers": {
+                  "crit_damage_reduction": 0.08
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "is_event_source_ally_excluding_self",
+            "target": "self"
+          },
+          "then": [
+            {
+              "type": "apply_status",
+              "status": "rexus_pack_momentum",
+              "duration": 2,
+              "target": "self",
+              "tags": ["buff"],
+              "data": {
+                "modifiers": {
+                  "crit_damage_mult": 0.15
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

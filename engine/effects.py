@@ -64,6 +64,18 @@ class EffectExecutor:
     def _condition_true(self, condition: Dict[str, Any], ctx: EffectContext) -> bool:
         ctype = condition.get("type")
 
+        if ctype == "is_event_target_dead":
+            meta_target = ctx.metadata.get("event_target")
+            if meta_target is None and ctx.targets:
+                meta_target = ctx.targets[0]
+            return meta_target is not None and not getattr(meta_target, "is_alive", False)
+
+        if ctype == "is_event_target_alive":
+            meta_target = ctx.metadata.get("event_target")
+            if meta_target is None and ctx.targets:
+                meta_target = ctx.targets[0]
+            return meta_target is not None and getattr(meta_target, "is_alive", False)
+
         if ctype == "all":
             return all(self._condition_true(c, ctx) for c in condition.get("conditions", []))
 
@@ -98,6 +110,25 @@ class EffectExecutor:
         if ctype == "is_event_source":
             meta_source = ctx.metadata.get("event_source")
             return meta_source is not None and meta_source == target
+
+        if ctype == "is_event_source_enemy":
+            meta_source = ctx.metadata.get("event_source")
+            return (
+                meta_source is not None
+                and getattr(meta_source, "team", None) is not None
+                and getattr(target, "team", None) is not None
+                and meta_source.team != target.team
+            )
+
+        if ctype == "is_event_source_ally_excluding_self":
+            meta_source = ctx.metadata.get("event_source")
+            return (
+                meta_source is not None
+                and getattr(meta_source, "team", None) is not None
+                and getattr(target, "team", None) is not None
+                and meta_source.team == target.team
+                and meta_source != target
+            )
 
         if ctype == "event_metadata_match":
             key = condition.get("key")
@@ -200,9 +231,17 @@ class EffectExecutor:
 
                 is_crit = False
                 if not no_crit:
-                    is_crit = random.random() < max(0.0, min(1.0, ctx.caster.crit_chance))
+                    crit_chance = ctx.caster.crit_chance
+                    crit_chance += ctx.caster.get_status_modifier("crit_chance_add")
+                    crit_chance += float(effect.params.get("crit_chance_bonus", 0.0))
+                    is_crit = random.random() < max(0.0, min(1.0, crit_chance))
                     if is_crit:
-                        dmg *= ctx.caster.crit_damage
+                        crit_mult = ctx.caster.crit_damage
+                        crit_mult *= max(0.0, 1.0 + ctx.caster.get_status_modifier("crit_damage_mult"))
+                        crit_reduction = target.get_status_modifier("crit_damage_reduction")
+                        if crit_reduction > 0:
+                            crit_mult *= max(0.0, 1.0 - crit_reduction)
+                        dmg *= crit_mult
 
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
                 self._apply_damage(target, dmg, ctx.caster, is_crit, damage_type=effect.params.get("damage_type", "physical"), source_skill=source_skill)

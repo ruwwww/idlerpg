@@ -15,7 +15,7 @@ def build_default_teams() -> tuple[Team, Team]:
 
     runtime_factory = HeroRuntimeFactory(source, Hero, Skill, Passive, Effect)
     team1 = Team(runtime_factory.create_team_heroes("team1_default"), 1)
-    team2 = Team(runtime_factory.create_team_heroes("team1_mythos_demo"), 2)
+    team2 = Team(runtime_factory.create_team_heroes("team1_rexus_demo"), 2)
     team1.opposite = team2
     team2.opposite = team1
     return team1, team2
