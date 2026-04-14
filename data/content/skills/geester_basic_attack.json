@@ -5,14 +5,14 @@
       "effects": [
         {
           "type": "damage",
-          "mult": 1.0,
+          "mult": 0.7,
           "mult_stack": "polymer_essence",
           "mult_per_stack": 0.05,
           "target": "lowest_hp_enemy"
         },
         {
           "type": "apply_dot_percent_damage_dealt",
-          "pct": 0.6,
+          "pct": 0.5,
           "target": "event_target",
           "damage_basis": "target_actual",
           "duration": 2

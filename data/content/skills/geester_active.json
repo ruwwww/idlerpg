@@ -5,7 +5,22 @@
       "effects": [
         {
           "type": "conditional",
-          "condition": { "type": "status_exists", "status": "bloomed" },
+          "condition": {
+            "type": "all",
+            "conditions": [
+              {
+                "type": "status_exists",
+                "status": "bloomed",
+                "target": "self"
+              },
+              {
+                "type": "stack_lte",
+                "stack": "shroom_potion",
+                "value": 0,
+                "target": "self"
+              }
+            ]
+          },
           "then": [
             {
               "type": "set_stack",
@@ -26,7 +41,7 @@
                     "n": 1
                   },
                   "effects": [
-                    { "type": "damage", "mult": 0.9, "target": "event_target" }
+                    { "type": "damage", "mult": 0.8, "target": "event_target" }
                   ]
                 },
                 {

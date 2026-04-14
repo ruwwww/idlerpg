@@ -383,10 +383,12 @@ class EffectExecutor:
                 before = target.hp
                 target.hp = min(target.max_hp, target.hp + amount)
                 recovered = target.hp - before
-                if recovered <= 0:
-                    continue
+                ctx.caster.combat_stats["healing_done_raw"] += amount
                 ctx.caster.combat_stats["healing_done"] += recovered
-                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f}.")
+                print(
+                    f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} "
+                    f"for {amount:.0f} (effective: {recovered:.0f})."
+                )
 
         def h_modify_stat(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -539,11 +541,16 @@ class EffectExecutor:
             stack_name = effect.params.get("stack")
             amount = int(effect.params.get("amount", 1))
             for target in targets:
+                before = max(0, int(target.stacks.get(stack_name, 0)))
                 consumed_timed = target.consume_timed_stack(stack_name, amount)
                 remaining = max(0, amount - consumed_timed)
                 if remaining > 0:
                     target.stacks[stack_name] = max(0, target.stacks.get(stack_name, 0) - remaining)
-                print(f"    {hero_tag(target)} consumed {amount} {stack_name} stack(s).")
+                consumed_actual = min(amount, before)
+                print(
+                    f"    {hero_tag(target)} consumed {consumed_actual} {stack_name} stack(s) "
+                    f"(remaining: {target.stacks.get(stack_name, 0)})."
+                )
 
         def h_add_shield(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -667,10 +674,12 @@ class EffectExecutor:
                 before = target.hp
                 target.hp = min(target.max_hp, target.hp + amount)
                 recovered = target.hp - before
-                if recovered <= 0:
-                    continue
+                ctx.caster.combat_stats["healing_done_raw"] += amount
                 ctx.caster.combat_stats["healing_done"] += recovered
-                print(f"    {hero_tag(target)} recovered {recovered:.0f} HP ({pct*100:.0f}% max HP).")
+                print(
+                    f"    {hero_tag(target)} recovered {amount:.0f} HP "
+                    f"({pct*100:.0f}% max HP, effective: {recovered:.0f})."
+                )
 
         def h_heal_lost_hp_pct(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
@@ -687,10 +696,12 @@ class EffectExecutor:
                 before = target.hp
                 target.hp = min(target.max_hp, target.hp + amount)
                 recovered = target.hp - before
-                if recovered <= 0:
-                    continue
+                ctx.caster.combat_stats["healing_done_raw"] += amount
                 ctx.caster.combat_stats["healing_done"] += recovered
-                print(f"    {hero_tag(target)} recovered {recovered:.0f} HP ({pct*100:.0f}% lost HP).")
+                print(
+                    f"    {hero_tag(target)} recovered {amount:.0f} HP "
+                    f"({pct*100:.0f}% lost HP, effective: {recovered:.0f})."
+                )
 
         def h_random_choice(effect: Effect, ctx: EffectContext):
             choices = effect.params.get("choices", [])
@@ -741,10 +752,12 @@ class EffectExecutor:
                 before = target.hp
                 target.hp = min(target.max_hp, target.hp + scaled)
                 recovered = target.hp - before
-                if recovered <= 0:
-                    continue
+                ctx.caster.combat_stats["healing_done_raw"] += scaled
                 ctx.caster.combat_stats["healing_done"] += recovered
-                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f} HP ({pct*100:.0f}% of damage dealt).")
+                print(
+                    f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {scaled:.0f} HP "
+                    f"({pct*100:.0f}% of damage dealt, effective: {recovered:.0f})."
+                )
 
         self.handlers["heal_percent_damage_dealt"] = h_heal_percent_damage_dealt
 
@@ -762,10 +775,12 @@ class EffectExecutor:
                 before = target.hp
                 target.hp = min(target.max_hp, target.hp + scaled)
                 recovered = target.hp - before
-                if recovered <= 0:
-                    continue
+                ctx.caster.combat_stats["healing_done_raw"] += scaled
                 ctx.caster.combat_stats["healing_done"] += recovered
-                print(f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {recovered:.0f} HP ({pct*100:.0f}% of actual damage dealt).")
+                print(
+                    f"    {hero_tag(ctx.caster)} healed {hero_tag(target)} for {scaled:.0f} HP "
+                    f"({pct*100:.0f}% of actual damage dealt, effective: {recovered:.0f})."
+                )
 
         self.handlers["heal_percent_actual_damage_dealt"] = h_heal_percent_actual_damage_dealt
 

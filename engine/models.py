@@ -85,6 +85,7 @@ class Hero:
             "damage_dealt_shield": 0.0,
             "damage_taken_hp": 0.0,
             "damage_taken_shield": 0.0,
+            "healing_done_raw": 0.0,
             "healing_done": 0.0,
             "shielding_done": 0.0
         }

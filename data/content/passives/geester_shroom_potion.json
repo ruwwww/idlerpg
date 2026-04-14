@@ -11,11 +11,11 @@
           "target": "self",
           "data": {
             "damage_reduction_per_stack": {
-              "shroom_potion": 0.15
+              "shroom_potion": 0.1
             }
           },
           "hooks": {
-            "on_battle_start": [
+            "on_create": [
               {
                 "type": "add_stack",
                 "stack": "shroom_potion",

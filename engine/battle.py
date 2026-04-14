@@ -302,5 +302,6 @@ class BattleEngine:
             print(f"    Damage Dealt (Shield): {stats['damage_dealt_shield']:>8.0f}")
             print(f"    Damage Taken (HP):     {stats['damage_taken_hp']:>8.0f}")
             print(f"    Damage Taken (Shield): {stats['damage_taken_shield']:>8.0f}")
-            print(f"    Healing Done:          {stats['healing_done']:>8.0f}")
+            print(f"    Healing Done (Raw):    {stats['healing_done_raw']:>8.0f}")
+            print(f"    Healing Done (Eff):    {stats['healing_done']:>8.0f}")
             print(f"    Shielding Done:        {stats['shielding_done']:>8.0f}")
