@@ -16,10 +16,62 @@
           "type": "add_stack",
           "stack": "abyssal_countdown",
           "amount": -1,
+          "min": 0,
           "target": {
             "selector": "marked_target",
             "status": "abyssal_eyes"
           }
+        },
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "stack_lte",
+            "target": {
+              "selector": "marked_target",
+              "status": "abyssal_eyes"
+            },
+            "stack": "abyssal_countdown",
+            "value": 0
+          },
+          "then": [
+            {
+              "type": "apply_status",
+              "status": "stun",
+              "duration": 4,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              },
+              "tags": ["cc"]
+            },
+            {
+              "type": "apply_status",
+              "status": "abyssal_punishment",
+              "duration": 3,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              },
+              "tags": ["debuff"],
+              "data": {
+                "damage_taken_up": 0.15
+              }
+            },
+            {
+              "type": "heal_max_hp_pct",
+              "pct": 0.5,
+              "target": "self"
+            },
+            {
+              "type": "set_stack",
+              "stack": "abyssal_countdown",
+              "value": 6,
+              "target": {
+                "selector": "marked_target",
+                "status": "abyssal_eyes"
+              }
+            }
+          ]
         },
         {
           "type": "apply_status",

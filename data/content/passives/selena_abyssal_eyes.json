@@ -59,7 +59,7 @@
                     {
                       "type": "modify_stat",
                       "stat_type": "energy",
-                      "add": -10,
+                      "add": -25,
                       "target": {
                         "selector": "marked_target",
                         "status": "abyssal_eyes"
@@ -69,6 +69,7 @@
                       "type": "add_stack",
                       "stack": "abyssal_countdown",
                       "amount": -1,
+                      "min": 0,
                       "target": {
                         "selector": "marked_target",
                         "status": "abyssal_eyes"
