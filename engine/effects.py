@@ -500,7 +500,7 @@ class EffectExecutor:
                             "timing": "normal",
                             "type": "damage",
                             "mult": float(effect.params.get("mult", 0.3)),
-                            "target": "self",
+                            "target": "owner",
                         }
                     ]
                 },
@@ -531,7 +531,7 @@ class EffectExecutor:
                             "timing": "normal",
                             "type": "damage",
                             "amount": "data.dot_damage",
-                            "target": "self",
+                            "target": "owner",
                             "no_crit": True,
                             "damage_type": "dot"
                         }]

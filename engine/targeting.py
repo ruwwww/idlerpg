@@ -46,13 +46,21 @@ class TargetResolver:
         if selector == "random_allies":
             pool = [h for h in allies if h != caster] or allies
             return random.sample(pool, min(n, len(pool))) if pool else []
+
+        if selector == "owner":
+            owner = ctx.metadata.get("owner")
+            if owner and getattr(owner, "is_alive", False):
+                return [owner]
+            return []
+
         if selector == "lowest_hp_enemy":
             return [min(enemies, key=lambda h: h.hp / max(1, h.max_hp))] if enemies else []
         if selector == "highest_atk_enemies":
             sorted_enemies = sorted(enemies, key=lambda h: h.compute_final_atk(), reverse=True)
             return sorted_enemies[:n]
         if selector == "lowest_hp_pct_allies":
-            sorted_allies = sorted(allies, key=lambda h: h.hp / max(1, h.max_hp))
+            other_allies = [h for h in allies if h != caster]
+            sorted_allies = sorted(other_allies, key=lambda h: h.hp / max(1, h.max_hp))
             return sorted_allies[:n]
         if selector == "highest_atk_enemies":
             return sorted(enemies, key=lambda h: h.atk, reverse=True)[:n]
