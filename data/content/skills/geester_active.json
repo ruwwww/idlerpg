@@ -21,6 +21,10 @@
                   "type": "repeat_stack_based",
                   "stack": "attack_times",
                   "base_times": 0,
+                  "reselect_dead_target": {
+                    "selector": "random_enemies",
+                    "n": 1
+                  },
                   "effects": [
                     { "type": "damage", "mult": 1.0, "target": "event_target" }
                   ]
@@ -54,6 +58,10 @@
                   "type": "repeat_stack_based",
                   "stack": "attack_times",
                   "base_times": 0,
+                  "reselect_dead_target": {
+                    "selector": "random_enemies",
+                    "n": 1
+                  },
                   "effects": [
                     { "type": "damage", "mult": 1.0, "target": "event_target" }
                   ]

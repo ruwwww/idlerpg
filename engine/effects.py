@@ -391,8 +391,16 @@ class EffectExecutor:
             stack_name = effect.params.get("stack")
             base_times = int(effect.params.get("base_times", 0))
             times = base_times + ctx.caster.stacks.get(stack_name, 0)
+            reselect_def = effect.params.get("reselect_dead_target")
             nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]
             for _ in range(max(0, times)):
+                if reselect_def and ctx.targets:
+                    # If the current target(s) are dead, re-roll using the provided target def
+                    for i in range(len(ctx.targets)):
+                        if not ctx.targets[i].is_alive:
+                            new_targets = ctx.battle.target_resolver.resolve(ctx.battle, ctx.caster, reselect_def, ctx)
+                            if new_targets:
+                                ctx.targets[i] = new_targets[0]
                 self.execute_list(nested, ctx)
 
         self.handlers["repeat_stack_based"] = h_repeat_stack_based
