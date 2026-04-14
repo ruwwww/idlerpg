@@ -188,6 +188,11 @@ class EffectExecutor:
         if not target.is_alive:
             return
 
+        # Energy from taking damage is only granted by real actions:
+        # basic attack (including basic override) or active skill.
+        if ctx.event not in {"basic", "basic_override", "skill"}:
+            return
+
         tracker = ctx.metadata.get("_damage_energy_tracker")
         if not isinstance(tracker, set):
             tracker = set()
