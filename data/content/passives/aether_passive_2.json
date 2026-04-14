@@ -19,7 +19,7 @@
               },
               {
                 "type": "add_shield",
-                "mult": 0.4,
+                "mult": 0.3,
                 "target": { "selector": "random_allies", "n": 2 }
               }
             ]
