@@ -14,23 +14,41 @@ class HeroRuntimeFactory:
         passive_ctor: Callable,
         effect_ctor: Callable,
         default_level: int = 160,
+        reference_level: int = 160,
+        growth_exponent: float = 1.0,
     ):
         self.source = source
         self.hero_ctor = hero_ctor
         self.skill_ctor = skill_ctor
         self.passive_ctor = passive_ctor
         self.effect_ctor = effect_ctor
-        self.default_level = default_level  # used when hero JSON has no "level" field
+        self.default_level = default_level      # used when hero JSON has no "level" field
+        self.reference_level = reference_level  # level at which JSON stats are defined
+        self.growth_exponent = growth_exponent  # 1.0 = linear, >1 = accelerating curve
+
+    def _scale_stat(self, base: float, hero_level: int) -> float:
+        """Scale a stat from reference_level to hero_level.
+
+        At hero_level == reference_level the scale factor is exactly 1.0,
+        so every existing hero JSON stays unchanged by default.
+        Speed is intentionally NOT scaled here — it is a kit stat.
+        """
+        if hero_level == self.reference_level:
+            return base
+        scale = (hero_level / self.reference_level) ** self.growth_exponent
+        return base * scale
 
     def create_hero(self, hero_id: str):
         hero_def = self.source.get_hero(hero_id)
+        hero_level = hero_def.level if hero_def.level is not None else self.default_level
+
         hero = self.hero_ctor(
             hero_def.name,
-            hero_def.speed,
-            hero_def.atk,
-            hero_def.hp,
-            hero_def.defense,
-            hero_def.level if hero_def.level is not None else self.default_level,
+            hero_def.speed,                              # Speed: not scaled (kit stat)
+            self._scale_stat(hero_def.atk, hero_level),
+            self._scale_stat(hero_def.hp, hero_level),
+            self._scale_stat(hero_def.defense, hero_level),
+            hero_level,
         )
         hero.precision = hero_def.precision
         hero.block = hero_def.block
