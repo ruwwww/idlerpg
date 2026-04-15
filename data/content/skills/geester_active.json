@@ -41,15 +41,15 @@
                     "n": 1
                   },
                   "effects": [
-                    { "type": "damage", "mult": 0.8, "target": "event_target" }
+                    { "type": "damage", "mult": 1, "target": "event_target" }
                   ]
                 },
                 {
                   "type": "apply_dot_percent_damage_dealt",
-                  "pct": 0.3,
+                  "pct": 0.5,
                   "damage_basis": "target_actual",
                   "target": "event_target",
-                  "duration": 2
+                  "duration": 3
                 },
                 {
                   "type": "heal_percent_damage_dealt",
@@ -84,7 +84,7 @@
                 },
                 {
                   "type": "apply_dot_percent_damage_dealt",
-                  "pct": 0.3,
+                  "pct": 0.4,
                   "damage_basis": "target_actual",
                   "target": "event_target",
                   "duration": 2

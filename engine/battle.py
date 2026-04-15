@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 from typing import Any, Dict, List, Optional, Set
 
@@ -10,7 +11,7 @@ from .utils import hero_tag
 
 
 class BattleEngine:
-    def __init__(self, team1: Team, team2: Team):
+    def __init__(self, team1: Team, team2: Team, battle_config: Optional[Dict[str, Any]] = None):
         self.team1 = team1
         self.team2 = team2
         self.team1.opposite = self.team2
@@ -26,6 +27,68 @@ class BattleEngine:
 
         self.target_resolver = TargetResolver()
         self.executor = EffectExecutor(self)
+
+        self.battle_config = dict(battle_config or {})
+        self.round_attack_ramp = self._build_round_attack_ramp_config(self.battle_config.get("round_attack_ramp"))
+        self.current_round_attack_multiplier = 1.0
+
+        for hero in self.all_heroes:
+            hero.behavior["_round_attack_multiplier"] = 1.0
+
+    def _build_round_attack_ramp_config(self, raw_config: Any) -> Dict[str, float | bool]:
+        data = raw_config if isinstance(raw_config, dict) else {}
+        enabled = bool(data.get("enabled", True))
+
+        start_round = int(data.get("start_round", 15))
+        start_round = max(1, start_round)
+
+        growth_rate = float(data.get("growth_rate", 0.12))
+        growth_rate = max(0.0, growth_rate)
+
+        base_multiplier = float(data.get("base_multiplier", 1.0))
+        base_multiplier = max(0.0, base_multiplier)
+
+        max_multiplier = float(data.get("max_multiplier", 5.0))
+        if max_multiplier <= 0:
+            max_multiplier = float("inf")
+
+        return {
+            "enabled": enabled,
+            "start_round": start_round,
+            "growth_rate": growth_rate,
+            "base_multiplier": base_multiplier,
+            "max_multiplier": max_multiplier,
+        }
+
+    def _compute_round_attack_multiplier(self, round_number: int) -> float:
+        cfg = self.round_attack_ramp
+        if not cfg.get("enabled", True):
+            return 1.0
+
+        base_multiplier = float(cfg.get("base_multiplier", 1.0))
+        start_round = int(cfg.get("start_round", 15))
+        growth_rate = float(cfg.get("growth_rate", 0.12))
+        max_multiplier = float(cfg.get("max_multiplier", float("inf")))
+
+        if round_number <= start_round:
+            return base_multiplier
+
+        rounds_after_start = round_number - start_round
+        scaled = base_multiplier * math.exp(growth_rate * rounds_after_start)
+        return min(scaled, max_multiplier)
+
+    def _apply_round_attack_ramp(self):
+        multiplier = self._compute_round_attack_multiplier(self.round)
+        self.current_round_attack_multiplier = multiplier
+        for hero in self.all_heroes:
+            hero.behavior["_round_attack_multiplier"] = multiplier
+
+        if multiplier > 1.0:
+            print(
+                "    [Round Ramp] ATK x"
+                f"{multiplier:.3f} (start>{int(self.round_attack_ramp['start_round'])}, "
+                f"rate={float(self.round_attack_ramp['growth_rate']):.3f})."
+            )
 
     def pick_default_target(self, caster: Hero) -> Optional[Hero]:
         enemies = [hero for hero in caster.team.opposite.heroes if hero.is_alive]
@@ -276,9 +339,11 @@ class BattleEngine:
 
         effects = [Effect(effect.type, **effect.params) for effect in caster.active_skill.effects]
         self.executor.execute_list(effects, EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name}))
+        # Consume energy immediately after the active is executed, before any
+        # post-cast triggers (artifact/passive hooks) grant fresh energy.
+        caster.energy = 0
         self.emit_event("on_active_skill_used", caster, self.action_damaged_targets, {"action_type": "skill", "source_skill": caster.active_skill.name})
         self.emit_event("after_skill", caster, [], {})
-        caster.energy = 0
 
     def tick_round_end(self):
         for hero in self.all_heroes:
@@ -328,6 +393,7 @@ class BattleEngine:
         ):
             self.round += 1
             print(f"\nTurn {self.round}")
+            self._apply_round_attack_ramp()
 
             round_anchor = next((hero for hero in self.all_heroes if hero.is_alive), None)
             if round_anchor:

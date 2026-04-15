@@ -14,6 +14,75 @@
         "atk_mult": 0.1
       }
     },
+    "resonance_nexus": {
+      "name": "Resonance Nexus",
+      "stat_bonuses": {
+        "max_hp_flat": 40000,
+        "max_hp_mult": 0.1,
+        "atk_flat": 5000,
+        "atk_mult": 0.08
+      },
+      "passive": {
+        "name": "Nexus Overflow",
+        "trigger_event": "on_create",
+        "unique_key": "resonance_nexus_unique",
+        "effects": [
+          {
+            "type": "modify_stat",
+            "stat_type": "energy",
+            "add": 50,
+            "target": "self"
+          },
+          {
+            "type": "apply_status",
+            "status": "resonance_nexus_flow",
+            "duration": 999,
+            "target": "self",
+            "tags": ["buff"],
+            "hooks": {
+              "on_active_skill_used": [
+                {
+                  "type": "modify_stat",
+                  "stat_type": "energy",
+                  "add": 20,
+                  "target": "all_allies"
+                },
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "random_chance",
+                    "chance": 0.5
+                  },
+                  "then": [
+                    {
+                      "type": "modify_stat",
+                      "stat_type": "energy",
+                      "add": 10,
+                      "target": "all_allies"
+                    }
+                  ]
+                },
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "random_chance",
+                    "chance": 0.2
+                  },
+                  "then": [
+                    {
+                      "type": "modify_stat",
+                      "stat_type": "energy",
+                      "add": 10,
+                      "target": "all_allies"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
     "predator_scope": {
       "name": "Predator Scope",
       "stat_bonuses": {

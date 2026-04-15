@@ -183,7 +183,10 @@ class Hero:
         atk_bonus = sum(b.value for b in self.buffs if b.name == "atk_buff")
         status_mult = self.get_status_modifier("atk_mult")
         flat_add = self.get_status_modifier("atk_flat_add")   # e.g. from ATK steal
-        return self.atk * max(0.0, (1.0 + atk_bonus + status_mult)) + flat_add
+        round_mult = float(self.behavior.get("_round_attack_multiplier", 1.0))
+        round_mult = max(0.0, round_mult)
+        base = self.atk * max(0.0, (1.0 + atk_bonus + status_mult)) + flat_add
+        return base * round_mult
 
     def compute_final_defense(self) -> float:
         """Effective armor value after status modifiers (before Armor Break)."""

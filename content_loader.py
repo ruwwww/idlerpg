@@ -87,6 +87,9 @@ class HeroContentSource(Protocol):
 
     def validate_references(self) -> None:
         ...
+    
+    def get_battle_config(self) -> Dict[str, Any]:
+        ...
 
 
 class JsonHeroContentSource:
@@ -115,6 +118,7 @@ class JsonHeroContentSource:
             team_id: [self._parse_team_member(entry) for entry in members]
             for team_id, members in self._raw.get("teams", {}).items()
         }
+        self._battle: Dict[str, Any] = dict(self._raw.get("battle", {}))
 
         self.validate_references()
 
@@ -132,6 +136,7 @@ class JsonHeroContentSource:
             "artifacts": {},
             "heroes": {},
             "teams": {},
+            "battle": {},
         }
 
         files = sorted(self.source_path.rglob("*.json"))
@@ -145,7 +150,7 @@ class JsonHeroContentSource:
             if not isinstance(raw, dict):
                 raise ValueError(f"Top-level JSON must be an object in {file_path}")
 
-            for section in ["skills", "passives", "artifacts", "heroes", "teams"]:
+            for section in ["skills", "passives", "artifacts", "heroes", "teams", "battle"]:
                 section_data = raw.get(section)
                 if section_data is None:
                     continue
@@ -239,6 +244,20 @@ class JsonHeroContentSource:
                         raise ValueError(
                             f"Team '{team_id}' member '{hero_ref}' has {len(artifact_ids)} artifacts, maximum is 3"
                         )
+
+        battle_data = self._raw.get("battle", {})
+        if not isinstance(battle_data, dict):
+            raise ValueError("Section 'battle' must be an object")
+        round_attack_ramp = battle_data.get("round_attack_ramp")
+        if round_attack_ramp is not None:
+            if not isinstance(round_attack_ramp, dict):
+                raise ValueError("battle.round_attack_ramp must be an object")
+            if "enabled" in round_attack_ramp and not isinstance(round_attack_ramp.get("enabled"), bool):
+                raise ValueError("battle.round_attack_ramp.enabled must be a boolean")
+            numeric_fields = ["start_round", "growth_rate", "base_multiplier", "max_multiplier"]
+            for field in numeric_fields:
+                if field in round_attack_ramp and not isinstance(round_attack_ramp.get(field), (int, float)):
+                    raise ValueError(f"battle.round_attack_ramp.{field} must be numeric")
 
     def _parse_effect(self, effect_data: Dict[str, Any]) -> EffectDef:
         if "type" not in effect_data:
@@ -413,3 +432,6 @@ class JsonHeroContentSource:
                     raise ValueError(
                         f"Artifact '{artifact.id}' passive uses unsupported effect type '{effect.type}'"
                     )
+    
+    def get_battle_config(self) -> Dict[str, Any]:
+        return dict(self._battle)
