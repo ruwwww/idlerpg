@@ -394,6 +394,9 @@ class EffectExecutor:
                     skill_mult = ctx.caster.get_status_modifier("skill_damage_mult")
                     if skill_mult != 0:
                         dmg *= max(0.0, 1.0 + skill_mult)
+                all_damage_mult = ctx.caster.get_status_modifier("all_damage_dealt_mult")
+                if all_damage_mult != 0:
+                    dmg *= max(0.0, 1.0 + all_damage_mult)
                 hp_threshold_pct = effect.params.get("hp_threshold_pct")
                 if hp_threshold_pct is not None:
                     if (target.hp / max(1, target.max_hp)) < (float(hp_threshold_pct) / 100.0):
@@ -504,6 +507,9 @@ class EffectExecutor:
                     skill_mult = ctx.caster.get_status_modifier("skill_damage_mult")
                     if skill_mult != 0:
                         dmg *= max(0.0, 1.0 + skill_mult)
+                all_damage_mult = ctx.caster.get_status_modifier("all_damage_dealt_mult")
+                if all_damage_mult != 0:
+                    dmg *= max(0.0, 1.0 + all_damage_mult)
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
                 dealt_actual = self._apply_damage(
                     target,
@@ -1289,6 +1295,9 @@ class EffectExecutor:
                     continue
                 # Accept either pct (% of ATK) or mult (raw multiplier, same units)
                 amount = ctx.caster.compute_final_atk() * (pct / 100.0 if pct else mult)
+                all_damage_mult = ctx.caster.get_status_modifier("all_damage_dealt_mult")
+                if all_damage_mult != 0:
+                    amount *= max(0.0, 1.0 + all_damage_mult)
                 if amount <= 0:
                     continue
                 dealt_actual = self._apply_damage(
@@ -1320,7 +1329,8 @@ class EffectExecutor:
             """
             Generic combat stat buff/debuff via apply_status + data.modifiers.
             Supported stat keys (read by get_status_modifier):
-              precision_add, block_add, holy_damage_add, armor_break_add,
+                            precision_add, block_add, holy_damage_add, armor_break_add,
+                            all_damage_dealt_mult,
               defense_add, defense_mult, atk_mult, etc.
             """
             stat = effect.params.get("stat")

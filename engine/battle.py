@@ -438,7 +438,14 @@ class BattleEngine:
                             }
                         )
 
-                self.emit_event("after_action", hero, [hero], {})
+                after_action_meta = {
+                    "event_source": hero,
+                    "event_target": hero,
+                    "action_type": action_type,
+                }
+                if action_type == "skill" and hero.active_skill:
+                    after_action_meta["source_skill"] = hero.active_skill.name
+                self.emit_event("after_action", hero, [hero], after_action_meta)
                 self.flush_queued_damage_energy()
 
             self.tick_round_end()

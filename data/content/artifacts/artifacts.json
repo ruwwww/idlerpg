@@ -83,6 +83,87 @@
         ]
       }
     },
+    "lantern_cataclysm_core": {
+      "name": "Lantern Cataclysm Core",
+      "stat_bonuses": {
+        "max_hp_flat": 50000,
+        "max_hp_mult": 0.12
+      },
+      "passive": {
+        "name": "Lantern Missiles",
+        "trigger_event": "on_create",
+        "unique_key": "lantern_cataclysm_core_unique",
+        "effects": [
+          {
+            "type": "add_combat_stat",
+            "stat": "all_damage_dealt_mult",
+            "value": 0.12,
+            "duration": 9999,
+            "target": "self"
+          },
+          {
+            "type": "add_stack",
+            "stack": "lantern_missiles",
+            "amount": 2,
+            "max": 20,
+            "target": "self"
+          },
+          {
+            "type": "apply_status",
+            "status": "lantern_missile_protocol",
+            "duration": 999,
+            "target": "self",
+            "tags": ["buff"],
+            "data": {
+              "modifiers_per_stack": {
+                "atk_mult": {
+                  "lantern_missiles": 0.03
+                }
+              }
+            },
+            "hooks": {
+              "on_after_action": [
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "event_metadata_match",
+                    "key": "action_type",
+                    "value": "skill"
+                  },
+                  "then": [
+                    {
+                      "type": "add_stack",
+                      "stack": "lantern_missiles",
+                      "amount": 1,
+                      "max": 20,
+                      "target": "self"
+                    },
+                    {
+                      "type": "repeat_stack_based",
+                      "stack": "lantern_missiles",
+                      "base_times": 0,
+                      "effects": [
+                        {
+                          "type": "damage",
+                          "mult": 0.25,
+                          "damage_type": "true",
+                          "no_crit": true,
+                          "no_counter": true,
+                          "target": {
+                            "selector": "random_enemies",
+                            "n": 1
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
     "predator_scope": {
       "name": "Predator Scope",
       "stat_bonuses": {
