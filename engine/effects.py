@@ -365,6 +365,14 @@ class EffectExecutor:
                 print(f"    {hero_tag(target)} has been defeated.")
                 self.battle.emit_event("on_death", caster, [target], {"dead": target, "event_source": caster, "event_target": target})
 
+        if hp_dealt > 0:
+            self.battle.emit_event(
+                "on_damage_dealt",
+                caster,
+                [target],
+                {"damage": hp_dealt, "damage_type": damage_type, "source": caster, "target": target}
+            )
+
         return shield_dealt + hp_dealt
 
 
@@ -419,6 +427,12 @@ class EffectExecutor:
                 # ── ARMOR BREAK ────────────────────────────────────────────────
                 armor_break = float(effect.params.get("armor_break_pct", 0.0))
 
+                damage_type = effect.params.get("damage_type", "physical")
+                if ctx.event == "basic":
+                    damage_type = "basic_attack"
+                elif ctx.event == "skill":
+                    damage_type = "active_skill"
+
                 # ── HOLY DAMAGE ────────────────────────────────────────────────
                 # holy_pct can come from the effect itself or a caster buff/status.
                 holy_pct = float(effect.params.get("holy_pct", 0.0))
@@ -445,7 +459,7 @@ class EffectExecutor:
                 # Normal hit (with Armor DR + Block, or true damage if condition met).
                 dealt_actual = self._apply_damage(
                     target, dmg, ctx.caster, is_crit,
-                    damage_type=effect.params.get("damage_type", "physical"),
+                    damage_type=damage_type,
                     source_skill=source_skill,
                     armor_break_pct=armor_break,
                     ignore_all_dr=ignore_all,
@@ -545,13 +559,27 @@ class EffectExecutor:
                         },
                     )
 
+                self.battle.last_action_damage += dmg
+
         def h_heal(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             mult = float(effect.params.get("mult", 1.0))
+            amount_param = effect.params.get("amount")
             for target in targets:
                 if not target or not target.is_alive:
                     continue
-                amount = ctx.caster.compute_final_atk() * mult
+                if amount_param is not None:
+                    if isinstance(amount_param, str):
+                        if amount_param.startswith("data.") and ctx.status:
+                            key = amount_param[5:]
+                            amount = float(ctx.status.data.get(key, 0.0))
+                        else:
+                            # Assume it's an expression
+                            amount = float(eval(amount_param, {"metadata": ctx.metadata, "damage": ctx.metadata.get("damage", 0), "stacks": ctx.caster.stacks, "battle": self.battle}))
+                    else:
+                        amount = float(amount_param)
+                else:
+                    amount = ctx.caster.compute_final_atk() * mult
                 amount = self._apply_outgoing_heal_scaling(amount, ctx.caster)
                 amount = self._apply_heal_scaling(amount, target)
                 if amount <= 0:

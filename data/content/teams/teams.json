@@ -10,28 +10,7 @@
   },
   "teams": {
     "team1_default": ["kayle", "selena", "aether", "angela", "aether"],
-    "team2_default": [
-      {
-        "hero": "brutus",
-        "artifacts": ["titanic_heart", "bastion_obelisk"]
-      },
-      {
-        "hero": "brutus",
-        "artifacts": ["titanic_heart", "bastion_obelisk"]
-      },
-      {
-        "hero": "brutus",
-        "artifacts": ["titanic_heart", "bastion_obelisk"]
-      },
-      {
-        "hero": "brutus",
-        "artifacts": ["titanic_heart", "bastion_obelisk"]
-      },
-      {
-        "hero": "brutus",
-        "artifacts": ["titanic_heart", "bastion_obelisk"]
-      }
-    ],
+    "team2_default": ["argus", "fredrin", "selena", "kayle", "aether"],
     "team1_mythos_demo": ["brutus"],
     "team1_rexus_demo": ["rexus", "fredrin", "selena", "geester", "mareia"],
     "team1_aether_demo": ["fredrin", "argus", "brutus", "aether", "geester"],
@@ -42,25 +21,21 @@
         "hero": "geester",
         "artifacts": [
           "lantern_cataclysm_core",
-          "arcane_drive",
-          "resonance_nexus"
+          "vampiric_edge",
+          "bastion_obelisk"
         ]
       },
       {
         "hero": "kayle",
         "artifacts": [
           "lantern_cataclysm_core",
-          "arcane_drive",
-          "resonance_nexus"
+          "resonance_nexus",
+          "bastion_obelisk"
         ]
       },
       {
-        "hero": "kayle",
-        "artifacts": [
-          "lantern_cataclysm_core",
-          "arcane_drive",
-          "resonance_nexus"
-        ]
+        "hero": "brutus",
+        "artifacts": ["titanic_heart", "bastion_obelisk"]
       }
     ],
     "artifact_empty_override_demo": [

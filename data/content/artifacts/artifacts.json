@@ -164,6 +164,63 @@
         ]
       }
     },
+    "vampiric_edge": {
+      "name": "Vampiric Edge",
+      "stat_bonuses": {
+        "atk_flat": 6000,
+        "armor_break_add": 0.15
+      },
+      "passive": {
+        "name": "Vampiric Strike",
+        "trigger_event": "on_create",
+        "unique_key": "vampiric_edge_unique",
+        "effects": [
+          {
+            "type": "apply_status",
+            "status": "vampiric_strike",
+            "duration": 999,
+            "target": "self",
+            "tags": ["buff"],
+            "hooks": {
+              "on_after_action": [
+                {
+                  "type": "conditional",
+                  "priority": 150,
+                  "condition": {
+                    "type": "event_metadata_match",
+                    "key": "action_type",
+                    "value": "skill"
+                  },
+                  "then": [
+                    {
+                      "type": "heal",
+                      "amount": "battle.last_action_damage * 0.25",
+                      "target": "self"
+                    }
+                  ]
+                },
+                {
+                  "type": "conditional",
+                  "priority": 150,
+                  "condition": {
+                    "type": "event_metadata_match",
+                    "key": "action_type",
+                    "value": "basic"
+                  },
+                  "then": [
+                    {
+                      "type": "heal",
+                      "amount": "battle.last_action_damage * 0.25",
+                      "target": "self"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
     "predator_scope": {
       "name": "Predator Scope",
       "stat_bonuses": {

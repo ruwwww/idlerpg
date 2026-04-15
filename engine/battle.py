@@ -234,7 +234,7 @@ class BattleEngine:
         if targets:
             metadata.setdefault("event_target", targets[0])
 
-        if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create"]:
+        if event_name in ["turn_start", "turn_end", "after_action", "on_basic_hit", "on_active_skill_used", "on_create", "on_damage_dealt"]:
             trigger_pool = [caster]
         elif event_name in ["on_block", "on_energy_full"]:
             # on_block/on_energy_full passives belong to the affected hero (targets[0]).
@@ -297,17 +297,16 @@ class BattleEngine:
         else:
             if caster.basic_skill:
                 effects = [Effect(effect.type, **effect.params) for effect in caster.basic_skill.effects]
-                self.executor.execute_list(
-                    effects,
-                    EffectContext(
-                        self,
-                        caster,
-                        [],
-                        "basic",
-                        self.round,
-                        {"source_skill": caster.basic_skill.name},
-                    ),
+                ctx = EffectContext(
+                    self,
+                    caster,
+                    [],
+                    "basic",
+                    self.round,
+                    {"source_skill": caster.basic_skill.name},
                 )
+                self.executor.execute_list(effects, ctx)
+                self.last_action_damage = ctx.damage_dealt
             else:
                 target_override = caster.behavior.get("basic_target")
                 if target_override and target_override.get("until_round", -1) >= self.round:
@@ -315,10 +314,12 @@ class BattleEngine:
                 else:
                     target_def = "lowest_hp_enemy"
 
+                ctx = EffectContext(self, caster, [], "basic", self.round, {})
                 self.executor.execute_effect(
                     Effect("damage", mult=1.0, target=target_def),
-                    EffectContext(self, caster, [], "basic", self.round, {}),
+                    ctx,
                 )
+                self.last_action_damage = ctx.damage_dealt
 
         basic_targets = list(dict.fromkeys(self.action_damaged_targets))
         basic_meta = {
@@ -343,7 +344,9 @@ class BattleEngine:
         print(f"    {hero_tag(caster)} cast [{caster.active_skill.name}].")
 
         effects = [Effect(effect.type, **effect.params) for effect in caster.active_skill.effects]
-        self.executor.execute_list(effects, EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name}))
+        ctx = EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name})
+        self.executor.execute_list(effects, ctx)
+        self.last_action_damage = ctx.damage_dealt
         # Consume energy immediately after the active is executed, before any
         # post-cast triggers (artifact/passive hooks) grant fresh energy.
         caster.energy = 0
@@ -422,6 +425,7 @@ class BattleEngine:
                     continue
 
                 self.action_damaged_targets.clear()
+                self.last_action_damage = 0.0
 
                 action_type = "basic"
                 if hero.energy >= 100:
@@ -447,6 +451,7 @@ class BattleEngine:
                     "event_source": hero,
                     "event_target": hero,
                     "action_type": action_type,
+                    "action_damage_dealt_raw": self.last_action_damage,
                 }
                 if action_type == "skill" and hero.active_skill:
                     after_action_meta["source_skill"] = hero.active_skill.name
