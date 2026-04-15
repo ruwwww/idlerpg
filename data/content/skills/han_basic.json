@@ -1,0 +1,84 @@
+{
+  "skills": {
+    "han_basic": {
+      "name": "Twin Edge Rhythm",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "status_exists",
+            "target": "self",
+            "status": "han_state_dawn"
+          },
+          "then": [
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 2 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.95,
+                  "crit_chance_bonus": 1.0,
+                  "target": "event_target"
+                }
+              ]
+            }
+          ],
+          "else": [
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 1 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 1.0,
+                  "target": "event_target"
+                },
+                {
+                  "type": "conditional",
+                  "condition": { "type": "random_chance", "chance": 0.4 },
+                  "then": [
+                    {
+                      "type": "apply_status",
+                      "status": "stun",
+                      "duration": 2,
+                      "target": "event_target",
+                      "tags": ["cc", "debuff"]
+                    }
+                  ]
+                },
+                {
+                  "type": "conditional",
+                  "condition": {
+                    "type": "all",
+                    "conditions": [
+                      {
+                        "type": "status_not_exists",
+                        "target": "event_target",
+                        "status": "stun"
+                      },
+                      {
+                        "type": "random_chance",
+                        "chance": 0.5
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "type": "apply_status",
+                      "status": "taunt",
+                      "duration": 3,
+                      "damage_reduction_pct": 10,
+                      "target": "event_target",
+                      "tags": ["cc", "debuff"]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

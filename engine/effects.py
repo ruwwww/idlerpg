@@ -1135,6 +1135,57 @@ class EffectExecutor:
             self.execute_effect(heal_effect, EffectContext(self.battle, ctx.caster, [target], ctx.event, ctx.round, ctx.metadata))
             print(f"    {hero_tag(ctx.caster)} dispelled {cc_type} from {hero_tag(target)}.")
 
+        def h_reflect_received_cc(effect: Effect, ctx: EffectContext):
+            event_target = ctx.metadata.get("event_target")
+            if event_target is None or event_target != ctx.caster:
+                return
+
+            cc_type = ctx.metadata.get("cc_type")
+            if not isinstance(cc_type, str) or not cc_type:
+                return
+
+            incoming = ctx.caster.get_status(cc_type)
+            if incoming is None:
+                return
+
+            mirrored_duration = max(1, int(incoming.duration))
+            mirrored_tags = list(incoming.tags)
+            mirrored_data = dict(incoming.data or {})
+            mirrored_hooks = dict(incoming.hooks or {})
+
+            ctx.caster.statuses = [status for status in ctx.caster.statuses if status.name != cc_type]
+            print(f"    {hero_tag(ctx.caster)} dispelled {cc_type}.")
+
+            enemies = [hero for hero in ctx.caster.team.opposite.heroes if hero.is_alive]
+            if not enemies:
+                return
+            reflected_target = random.choice(enemies)
+            reflected_status = Status(
+                name=cc_type,
+                duration=mirrored_duration,
+                stacks=1,
+                tags=mirrored_tags,
+                data=mirrored_data,
+                hooks=mirrored_hooks,
+                source_name=ctx.caster.name,
+                source_skill=ctx.metadata.get("source_skill"),
+            )
+            reflected_target.statuses.append(reflected_status)
+            print(f"    {hero_tag(reflected_target)} gained status {cc_type} ({mirrored_duration} rounds).")
+
+            if "cc" in reflected_status.tags:
+                self.battle.emit_event(
+                    "on_ally_receive_cc",
+                    ctx.caster,
+                    [reflected_target],
+                    {
+                        "target": reflected_target,
+                        "cc_type": cc_type,
+                        "event_source": ctx.caster,
+                        "event_target": reflected_target,
+                    },
+                )
+
         def h_apply_shield_resonance(effect: Effect, ctx: EffectContext):
             targets = self._resolve_targets(effect, ctx)
             for target in targets:
@@ -1176,6 +1227,7 @@ class EffectExecutor:
         self.register("modify_heal", h_modify_heal)
         self.register("override_basic", h_override_basic)
         self.register("angela_dispel", h_angela_dispel)
+        self.register("reflect_received_cc", h_reflect_received_cc)
         self.register("apply_shield_resonance", h_apply_shield_resonance)
 
         # ── NEW MECHANICS: Armor Break / Precision / Block / Holy ────────────────

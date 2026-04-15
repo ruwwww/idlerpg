@@ -1,0 +1,86 @@
+{
+  "passives": {
+    "han_passive_2": {
+      "name": "Echoed Will",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "han_round_cc_core",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "hooks": {
+            "on_round_start": [
+              {
+                "type": "apply_status",
+                "status": "han_round_focus_atk",
+                "duration": 1,
+                "target": "self",
+                "tags": ["buff"],
+                "data": {
+                  "modifiers": {
+                    "atk_mult": 0.05
+                  }
+                }
+              },
+              {
+                "type": "apply_status",
+                "status": "han_cc_mirror_token",
+                "duration": 1,
+                "target": "self",
+                "tags": ["buff"]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "han_passive_2_reflect": {
+      "name": "Echoed Will Reflect",
+      "trigger_event": "on_ally_receive_cc",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "all",
+            "conditions": [
+              {
+                "type": "is_event_target",
+                "target": "self"
+              },
+              {
+                "type": "status_exists",
+                "target": "self",
+                "status": "han_cc_mirror_token"
+              }
+            ]
+          },
+          "then": [
+            {
+              "type": "remove_status",
+              "status": "han_cc_mirror_token",
+              "target": "self"
+            },
+            {
+              "type": "remove_status",
+              "status": "han_round_focus_atk",
+              "target": "self"
+            },
+            {
+              "type": "reflect_received_cc",
+              "target": "self"
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "cc_immunity_chance",
+              "value": 0.05,
+              "duration": 1,
+              "target": "self"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

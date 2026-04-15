@@ -329,6 +329,10 @@ class BattleEngine:
             self.round += 1
             print(f"\nTurn {self.round}")
 
+            round_anchor = next((hero for hero in self.all_heroes if hero.is_alive), None)
+            if round_anchor:
+                self.emit_event("round_start", round_anchor, [], {})
+
             order = sorted(self.all_heroes, key=lambda hero: (-hero.compute_final_speed(), self.all_heroes.index(hero)))
             for hero in order:
                 if not hero.is_alive:

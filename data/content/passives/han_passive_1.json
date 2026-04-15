@@ -1,0 +1,80 @@
+{
+  "passives": {
+    "han_passive_1": {
+      "name": "Solar-Dusk Command",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "apply_status",
+          "status": "han_aura_core",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "hooks": {
+            "on_round_start": [
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "status_exists",
+                  "target": "self",
+                  "status": "han_state_dawn"
+                },
+                "then": [
+                  {
+                    "type": "add_combat_stat",
+                    "stat": "holy_damage_add",
+                    "value": 15.0,
+                    "duration": 1,
+                    "target": "all_allies"
+                  },
+                  {
+                    "type": "add_combat_stat",
+                    "stat": "crit_damage_mult",
+                    "value": 0.1,
+                    "duration": 1,
+                    "target": "all_allies"
+                  }
+                ],
+                "else": [
+                  {
+                    "type": "add_combat_stat",
+                    "stat": "damage_reduction",
+                    "value": 0.1,
+                    "duration": 1,
+                    "target": "all_allies"
+                  },
+                  {
+                    "type": "add_combat_stat",
+                    "stat": "cc_immunity_chance",
+                    "value": 0.05,
+                    "duration": 1,
+                    "target": "all_allies"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "listen_event",
+          "event": "on_death",
+          "duration": 999,
+          "effects": [
+            {
+              "type": "heal_max_hp_pct",
+              "pct": 0.15,
+              "target": "self"
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "holy_damage_add",
+              "value": 10.0,
+              "duration": 2,
+              "target": "self"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "skills": {
+    "han_active": {
+      "name": "Solar Rift",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "status_exists",
+            "target": "self",
+            "status": "han_state_dawn"
+          },
+          "then": [
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 4 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 0.9,
+                  "crit_chance_bonus": 1.0,
+                  "target": "event_target"
+                }
+              ]
+            },
+            {
+              "type": "with_target",
+              "target": { "selector": "highest_hp_enemies", "n": 3 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 1.0,
+                  "target": "event_target"
+                },
+                {
+                  "type": "damage_target_max_hp_pct",
+                  "pct": 0.08,
+                  "target": "event_target"
+                }
+              ]
+            },
+            {
+              "type": "with_target",
+              "target": { "selector": "lowest_hp_enemies", "n": 2 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 1.1,
+                  "holy_pct": 25.0,
+                  "target": "event_target"
+                }
+              ]
+            },
+            {
+              "type": "armor_break",
+              "pct": 20.0,
+              "duration": 3,
+              "target": { "selector": "random_enemies", "n": 3 }
+            }
+          ],
+          "else": [
+            {
+              "type": "with_target",
+              "target": { "selector": "random_enemies", "n": 3 },
+              "effects": [
+                {
+                  "type": "damage",
+                  "mult": 1.0,
+                  "target": "event_target"
+                },
+                {
+                  "type": "conditional",
+                  "condition": { "type": "random_chance", "chance": 0.4 },
+                  "then": [
+                    {
+                      "type": "apply_status",
+                      "status": "stun",
+                      "duration": 2,
+                      "target": "event_target",
+                      "tags": ["cc", "debuff"]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "add_shield",
+              "max_hp_pct": 0.3,
+              "duration": 3,
+              "status": "han_dusk_self_shield",
+              "target": "self"
+            },
+            {
+              "type": "add_shield",
+              "mult": 0.5,
+              "duration": 3,
+              "status": "han_dusk_ally_shield",
+              "target": "all_other_allies"
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "cc_immunity_chance",
+              "value": 0.2,
+              "duration": 3,
+              "target": { "selector": "highest_atk_allies", "n": 2 }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

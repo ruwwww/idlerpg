@@ -121,6 +121,22 @@
       "active_skill": "aether_active",
       "passives": ["aether_passive_1", "aether_passive_2", "aether_passive_3"]
     },
+    "han": {
+      "name": "Han",
+      "role": "fighter",
+      "speed": 1210,
+      "atk": 52000,
+      "hp": 310000,
+      "defense": 11500,
+      "basic_attack": "han_basic",
+      "active_skill": "han_active",
+      "passives": [
+        "han_passive_1",
+        "han_passive_2",
+        "han_passive_2_reflect",
+        "han_passive_3"
+      ]
+    },
     "kayle": {
       "name": "Kayle",
       "speed": 1380,

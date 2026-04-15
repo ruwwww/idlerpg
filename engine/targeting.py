@@ -55,6 +55,8 @@ class TargetResolver:
             return enemies
         if selector == "all_allies":
             return allies
+        if selector == "all_other_allies":
+            return [h for h in allies if h != caster]
         if selector == "random_enemies":
             if taunt_target and n <= 1:
                 self._mark_taunt_forced(ctx, taunt_target)
@@ -96,9 +98,25 @@ class TargetResolver:
                 return [taunt_target]
             sorted_enemies = sorted(enemies, key=lambda h: h.compute_final_atk(), reverse=True)
             return sorted_enemies[:n]
+        if selector == "highest_hp_enemies":
+            if taunt_target and n <= 1:
+                self._mark_taunt_forced(ctx, taunt_target)
+                return [taunt_target]
+            sorted_enemies = sorted(enemies, key=lambda h: h.hp, reverse=True)
+            return sorted_enemies[:n]
+        if selector == "lowest_hp_enemies":
+            if taunt_target and n <= 1:
+                self._mark_taunt_forced(ctx, taunt_target)
+                return [taunt_target]
+            sorted_enemies = sorted(enemies, key=lambda h: h.hp)
+            return sorted_enemies[:n]
         if selector == "lowest_hp_pct_allies":
             other_allies = [h for h in allies if h != caster]
             sorted_allies = sorted(other_allies, key=lambda h: h.hp / max(1, h.max_hp))
+            return sorted_allies[:n]
+        if selector == "highest_atk_allies":
+            other_allies = [h for h in allies if h != caster]
+            sorted_allies = sorted(other_allies, key=lambda h: h.compute_final_atk(), reverse=True)
             return sorted_allies[:n]
         if selector == "lowest_hp_pct_allies_priority":
             other_allies = [h for h in allies if h != caster]

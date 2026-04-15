@@ -1,0 +1,139 @@
+{
+  "passives": {
+    "han_passive_3": {
+      "name": "Day-Night Conversion",
+      "trigger_event": "on_create",
+      "effects": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "stat_gte",
+            "target": "self",
+            "stat": "energy",
+            "value": 100
+          },
+          "then": [
+            {
+              "type": "remove_status",
+              "status": "han_state_dawn",
+              "target": "self"
+            },
+            {
+              "type": "apply_status",
+              "status": "han_state_dusk",
+              "duration": 999,
+              "target": "self",
+              "tags": ["buff"]
+            },
+            {
+              "type": "add_shield",
+              "max_hp_pct": 0.2,
+              "duration": 4,
+              "status": "han_dusk_opening_shield",
+              "target": "self"
+            }
+          ],
+          "else": [
+            {
+              "type": "remove_status",
+              "status": "han_state_dusk",
+              "target": "self"
+            },
+            {
+              "type": "apply_status",
+              "status": "han_state_dawn",
+              "duration": 999,
+              "target": "self",
+              "tags": ["buff"]
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "holy_damage_add",
+              "value": 10.0,
+              "duration": 4,
+              "target": "self"
+            },
+            {
+              "type": "add_combat_stat",
+              "stat": "speed_delta",
+              "value": 120,
+              "duration": 4,
+              "target": "self"
+            }
+          ]
+        },
+        {
+          "type": "apply_status",
+          "status": "han_form_cycle_core",
+          "duration": 999,
+          "target": "self",
+          "tags": ["buff"],
+          "hooks": {
+            "on_active_skill_used": [
+              {
+                "type": "add_stack",
+                "stack": "han_active_cycle_count",
+                "amount": 1,
+                "max": 2,
+                "target": "self"
+              },
+              {
+                "type": "conditional",
+                "condition": {
+                  "type": "stack_gte",
+                  "target": "self",
+                  "stack": "han_active_cycle_count",
+                  "value": 2
+                },
+                "then": [
+                  {
+                    "type": "set_stack",
+                    "stack": "han_active_cycle_count",
+                    "value": 0,
+                    "target": "self"
+                  },
+                  {
+                    "type": "conditional",
+                    "condition": {
+                      "type": "status_exists",
+                      "target": "self",
+                      "status": "han_state_dawn"
+                    },
+                    "then": [
+                      {
+                        "type": "remove_status",
+                        "status": "han_state_dawn",
+                        "target": "self"
+                      },
+                      {
+                        "type": "apply_status",
+                        "status": "han_state_dusk",
+                        "duration": 999,
+                        "target": "self",
+                        "tags": ["buff"]
+                      }
+                    ],
+                    "else": [
+                      {
+                        "type": "remove_status",
+                        "status": "han_state_dusk",
+                        "target": "self"
+                      },
+                      {
+                        "type": "apply_status",
+                        "status": "han_state_dawn",
+                        "duration": 999,
+                        "target": "self",
+                        "tags": ["buff"]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
