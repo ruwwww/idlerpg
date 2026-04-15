@@ -1,0 +1,52 @@
+{
+  "artifacts": {
+    "titanic_heart": {
+      "name": "Titanic Heart",
+      "stat_bonuses": {
+        "max_hp_flat": 45000,
+        "max_hp_mult": 0.12
+      }
+    },
+    "fury_emblem": {
+      "name": "Fury Emblem",
+      "stat_bonuses": {
+        "atk_flat": 7000,
+        "atk_mult": 0.1
+      }
+    },
+    "predator_scope": {
+      "name": "Predator Scope",
+      "stat_bonuses": {
+        "atk_flat": 5500,
+        "crit_chance_add": 0.12,
+        "crit_damage_add": 0.25
+      }
+    },
+    "arcane_drive": {
+      "name": "Arcane Drive",
+      "stat_bonuses": {
+        "atk_flat": 3500
+      },
+      "passive": {
+        "name": "Arcane Acceleration",
+        "trigger_event": "on_create",
+        "unique_key": "arcane_drive_unique",
+        "effects": [
+          {
+            "type": "add_combat_stat",
+            "stat": "skill_damage_mult",
+            "value": 0.15,
+            "duration": 9999,
+            "target": "self"
+          },
+          {
+            "type": "modify_stat",
+            "stat_type": "energy",
+            "add": 50,
+            "target": "self"
+          }
+        ]
+      }
+    }
+  }
+}

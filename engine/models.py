@@ -97,6 +97,7 @@ class Hero:
         self.passives: List[Passive] = []
         self.basic_skill: Optional[Skill] = None
         self.active_skill: Optional[Skill] = None
+        self.artifacts: List[str] = []
 
         self.stacks: Dict[str, int] = defaultdict(int)
         self.stack_ttls: Dict[str, List[int]] = defaultdict(list)
