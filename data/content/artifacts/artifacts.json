@@ -221,6 +221,44 @@
         ]
       }
     },
+    "aegis_ravager": {
+      "name": "Aegis Ravager",
+      "stat_bonuses": {
+        "atk_flat": 6000,
+        "atk_mult": 0.12,
+        "max_hp_mult": 0.1
+      },
+      "passive": {
+        "name": "Aegis Verge",
+        "trigger_event": "on_create",
+        "unique_key": "aegis_ravager_unique",
+        "effects": [
+          {
+            "type": "add_combat_stat",
+            "stat": "shield_damage_mult",
+            "value": 0.8,
+            "duration": 9999,
+            "target": "self"
+          },
+          {
+            "type": "apply_status",
+            "status": "aegis_ravager_shell",
+            "duration": 999,
+            "target": "self",
+            "tags": ["buff"],
+            "hooks": {
+              "on_after_action": [
+                {
+                  "type": "add_shield",
+                  "amount": "metadata.get('action_unshielded_damage_actual', 0) * 0.1",
+                  "target": "self"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
     "predator_scope": {
       "name": "Predator Scope",
       "stat_bonuses": {

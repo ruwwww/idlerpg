@@ -21,6 +21,8 @@ class BattleEngine:
         self.round = 0
         self.listeners: List[Dict[str, Any]] = []
         self.action_damaged_targets: List[Hero] = []
+        self.last_action_damage: float = 0.0
+        self.last_action_unshielded_damage: float = 0.0
         self.pending_damage_energy: Dict[Hero, float] = {}
         self.pending_damage_energy_sources: Dict[Hero, Hero] = {}
         self.pending_damage_energy_targets: Set[Hero] = set()
@@ -291,7 +293,10 @@ class BattleEngine:
                 target=payload.get("target", "lowest_hp_enemy"),
                 shield_steal_pct=payload.get("shield_steal_pct", 0.0),
             )
-            self.executor.execute_effect(effect, EffectContext(self, caster, [], "basic_override", self.round, {}))
+            ctx = EffectContext(self, caster, [], "basic_override", self.round, {})
+            self.executor.execute_effect(effect, ctx)
+            self.last_action_damage = ctx.damage_dealt
+            self.last_action_unshielded_damage = float(ctx.metadata.get("action_unshielded_damage_actual", 0.0))
             if not payload.get("persistent", False):
                 caster.behavior.pop("basic_override", None)
         else:
@@ -307,6 +312,7 @@ class BattleEngine:
                 )
                 self.executor.execute_list(effects, ctx)
                 self.last_action_damage = ctx.damage_dealt
+                self.last_action_unshielded_damage = float(ctx.metadata.get("action_unshielded_damage_actual", 0.0))
             else:
                 target_override = caster.behavior.get("basic_target")
                 if target_override and target_override.get("until_round", -1) >= self.round:
@@ -320,6 +326,7 @@ class BattleEngine:
                     ctx,
                 )
                 self.last_action_damage = ctx.damage_dealt
+                self.last_action_unshielded_damage = float(ctx.metadata.get("action_unshielded_damage_actual", 0.0))
 
         basic_targets = list(dict.fromkeys(self.action_damaged_targets))
         basic_meta = {
@@ -347,6 +354,7 @@ class BattleEngine:
         ctx = EffectContext(self, caster, [], "skill", self.round, {"overcharge": over, "source_skill": caster.active_skill.name})
         self.executor.execute_list(effects, ctx)
         self.last_action_damage = ctx.damage_dealt
+        self.last_action_unshielded_damage = float(ctx.metadata.get("action_unshielded_damage_actual", 0.0))
         # Consume energy immediately after the active is executed, before any
         # post-cast triggers (artifact/passive hooks) grant fresh energy.
         caster.energy = 0
@@ -426,6 +434,7 @@ class BattleEngine:
 
                 self.action_damaged_targets.clear()
                 self.last_action_damage = 0.0
+                self.last_action_unshielded_damage = 0.0
 
                 action_type = "basic"
                 if hero.energy >= 100:
@@ -452,6 +461,7 @@ class BattleEngine:
                     "event_target": hero,
                     "action_type": action_type,
                     "action_damage_dealt_raw": self.last_action_damage,
+                    "action_unshielded_damage_actual": self.last_action_unshielded_damage,
                 }
                 if action_type == "skill" and hero.active_skill:
                     after_action_meta["source_skill"] = hero.active_skill.name

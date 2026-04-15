@@ -443,6 +443,15 @@ class EffectExecutor:
                     holy_dmg = ctx.caster.compute_final_atk() * (holy_pct / 100.0)
 
                 source_skill = ctx.status.source_skill if ctx.status else ctx.metadata.get("source_skill")
+                target_shield_start = ctx.metadata.setdefault("action_target_start_shield", {})
+                if target not in target_shield_start:
+                    target_shield_start[target] = target.shield > 0
+                target_had_shield_at_start = bool(target_shield_start[target])
+                if target_had_shield_at_start:
+                    shield_mult = ctx.caster.get_status_modifier("shield_damage_mult")
+                    if shield_mult != 0:
+                        dmg *= max(0.0, 1.0 + shield_mult)
+
                 if (
                     ctx.metadata.get("taunt_forced")
                     and not ctx.metadata.get("taunt_forced_logged")
@@ -487,6 +496,8 @@ class EffectExecutor:
                 actual_by_target = ctx.metadata.setdefault("action_damage_by_target_actual", {})
                 raw_by_target[target.name] = float(raw_by_target.get(target.name, 0.0)) + dmg
                 actual_by_target[target.name] = float(actual_by_target.get(target.name, 0.0)) + dealt_actual
+                if not target_had_shield_at_start and dealt_actual > 0:
+                    ctx.metadata["action_unshielded_damage_actual"] = float(ctx.metadata.get("action_unshielded_damage_actual", 0.0)) + dealt_actual
                 if not effect.params.get("no_counter", False):
                     self.battle.action_damaged_targets.append(target)
                     self.battle.emit_event(
@@ -776,6 +787,7 @@ class EffectExecutor:
             target_max_hp_pct = float(effect.params.get("target_max_hp_pct", 0.0))
             duration = int(effect.params.get("duration", 0))
             shield_status_name = str(effect.params.get("status", "temporary_shield"))
+            amount_param = effect.params.get("amount")
             for target in targets:
                 if not target or not target.is_alive:
                     continue
@@ -786,6 +798,15 @@ class EffectExecutor:
                     amount += ctx.caster.max_hp * max_hp_pct
                 if target_max_hp_pct > 0:
                     amount += target.max_hp * target_max_hp_pct
+                if amount_param is not None:
+                    if isinstance(amount_param, str):
+                        if amount_param.startswith("data.") and ctx.status:
+                            key = amount_param[5:]
+                            amount += float(ctx.status.data.get(key, 0.0))
+                        else:
+                            amount += float(eval(amount_param, {"metadata": ctx.metadata, "damage": ctx.metadata.get("damage", 0), "stacks": ctx.caster.stacks, "battle": self.battle}))
+                    else:
+                        amount += float(amount_param)
                 amount = self._apply_outgoing_shield_scaling(amount, ctx.caster)
                 amount = self._apply_shield_scaling(amount, target)
                 if amount > 0:
