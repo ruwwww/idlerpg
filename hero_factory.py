@@ -29,6 +29,8 @@ class HeroRuntimeFactory:
     def _apply_artifact_stats(self, hero, artifacts: List):
         hp_flat = 0.0
         hp_mult = 0.0
+        max_shield_flat = 0.0
+        max_shield_mult = 0.0
         atk_flat = 0.0
         atk_mult = 0.0
         defense_flat = 0.0
@@ -43,6 +45,8 @@ class HeroRuntimeFactory:
             bonuses = artifact.stat_bonuses
             hp_flat += float(bonuses.get("max_hp_flat", 0.0)) + float(bonuses.get("hp_flat", 0.0))
             hp_mult += float(bonuses.get("max_hp_mult", 0.0)) + float(bonuses.get("hp_mult", 0.0))
+            max_shield_flat += float(bonuses.get("max_shield_flat", 0.0))
+            max_shield_mult += float(bonuses.get("max_shield_mult", 0.0))
             atk_flat += float(bonuses.get("atk_flat", 0.0))
             atk_mult += float(bonuses.get("atk_mult", 0.0))
             defense_flat += float(bonuses.get("defense_flat", 0.0))
@@ -56,7 +60,9 @@ class HeroRuntimeFactory:
         if hp_flat != 0.0 or hp_mult != 0.0:
             hero.max_hp = max(1.0, hero.max_hp * max(0.0, 1.0 + hp_mult) + hp_flat)
             hero.hp = hero.max_hp
-            hero.max_shield = hero.max_hp
+
+        # Base shield cap follows max HP, then artifact bonuses can extend it.
+        hero.max_shield = max(1.0, hero.max_hp * max(0.0, 1.0 + max_shield_mult) + max_shield_flat)
 
         if atk_flat != 0.0 or atk_mult != 0.0:
             hero.atk = max(1.0, hero.atk * max(0.0, 1.0 + atk_mult) + atk_flat)

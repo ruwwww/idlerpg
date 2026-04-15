@@ -569,10 +569,13 @@ class EffectExecutor:
                 prev_energy = target.energy if stat_type == "energy" else None
                 if stat_type == "max_hp":
                     if mult is not None:
+                        before_max_hp = max(1.0, float(target.max_hp))
+                        before_max_shield = max(before_max_hp, float(target.max_shield))
+                        shield_cap_ratio = before_max_shield / before_max_hp
                         current_pct = target.hp / max(1.0, target.max_hp)
                         target.max_hp *= float(mult)
                         target.hp = target.max_hp * current_pct
-                        target.max_shield = target.max_hp
+                        target.max_shield = target.max_hp * shield_cap_ratio
                         print(f"    {hero_tag(target)} max HP changed to {target.max_hp:.0f}.")
                     continue
                 if not hasattr(target, stat_type):
@@ -779,7 +782,33 @@ class EffectExecutor:
                     ctx.caster.combat_stats["shielding_done"] += gained
                     print(f"    {hero_tag(target)} gained {gained:.0f} shield (Total: {target.shield:.0f}).")
 
+        def h_top_up_shield_to_max_hp_pct_cap(effect: Effect, ctx: EffectContext):
+            targets = self._resolve_targets(effect, ctx)
+            pct = float(effect.params.get("pct", effect.params.get("max_hp_pct", 0.0)))
+            if pct <= 0:
+                return
+            for target in targets:
+                if not target or not target.is_alive:
+                    continue
+
+                desired_shield = max(0.0, target.max_hp * pct)
+                if target.shield >= desired_shield:
+                    continue
+
+                room_to_cap = max(0.0, target.max_shield - target.shield)
+                if room_to_cap <= 0:
+                    continue
+
+                gain = min(desired_shield - target.shield, room_to_cap)
+                if gain <= 0:
+                    continue
+
+                target.shield += gain
+                ctx.caster.combat_stats["shielding_done"] += gain
+                print(f"    {hero_tag(target)} gained {gain:.0f} shield (Total: {target.shield:.0f}).")
+
         self.handlers["add_shield"] = h_add_shield
+        self.handlers["top_up_shield_to_max_hp_pct_cap"] = h_top_up_shield_to_max_hp_pct_cap
 
         def h_sequence(effect: Effect, ctx: EffectContext):
             nested = [Effect(entry["type"], **{k: v for k, v in entry.items() if k != "type"}) for entry in effect.params.get("effects", [])]

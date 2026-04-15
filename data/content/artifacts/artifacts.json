@@ -47,6 +47,56 @@
           }
         ]
       }
+    },
+    "bastion_obelisk": {
+      "name": "Bastion Obelisk",
+      "stat_bonuses": {
+        "max_hp_flat": 55000,
+        "max_hp_mult": 0.18,
+        "max_shield_mult": 0.5
+      },
+      "passive": {
+        "name": "Fortified Relay",
+        "trigger_event": "on_create",
+        "unique_key": "bastion_obelisk_unique",
+        "effects": [
+          {
+            "type": "add_combat_stat",
+            "stat": "crit_damage_reduction",
+            "value": 0.25,
+            "duration": 9999,
+            "target": "self"
+          },
+          {
+            "type": "add_combat_stat",
+            "stat": "shield_damage_reduction",
+            "value": 0.2,
+            "duration": 9999,
+            "target": "self"
+          },
+          {
+            "type": "top_up_shield_to_max_hp_pct_cap",
+            "pct": 0.3,
+            "target": "self"
+          },
+          {
+            "type": "apply_status",
+            "status": "bastion_obelisk_core",
+            "duration": 999,
+            "target": "self",
+            "tags": ["buff"],
+            "hooks": {
+              "on_round_start": [
+                {
+                  "type": "top_up_shield_to_max_hp_pct_cap",
+                  "pct": 0.3,
+                  "target": "self"
+                }
+              ]
+            }
+          }
+        ]
+      }
     }
   }
 }

@@ -1,30 +1,18 @@
 {
   "teams": {
     "team1_default": ["kayle", "selena", "aether", "angela", "aether"],
-    "team2_default": ["argus", "angela", "brutus", "aether", "kayle"],
+    "team2_default": [
+      {
+        "hero": "brutus",
+        "artifacts": ["bastion_obelisk", "predator_scope", "titanic_heart"]
+      }
+    ],
     "team1_mythos_demo": ["brutus"],
     "team1_rexus_demo": ["rexus", "fredrin", "selena", "geester", "mareia"],
     "team1_aether_demo": ["fredrin", "argus", "brutus", "aether", "geester"],
     "kayle_demo": ["kayle", "fredrin", "aether", "angela", "selena"],
     "han_demo": ["han", "selena", "geester", "fredrin", "aether"],
-    "artifact_loadout_demo": [
-      {
-        "hero": "han",
-        "artifacts": ["arcane_drive", "predator_scope", "titanic_heart"]
-      },
-      {
-        "hero": "selena",
-        "artifacts": ["fury_emblem"]
-      },
-      {
-        "hero": "angela"
-      },
-      "fredrin",
-      {
-        "hero": "kayle",
-        "artifacts": ["titanic_heart", "fury_emblem", "arcane_drive"]
-      }
-    ],
+    "artifact_loadout_demo": ["geester"],
     "artifact_empty_override_demo": [
       {
         "hero": "han",
