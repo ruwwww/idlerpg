@@ -203,6 +203,11 @@ class BattleEngine:
         This supports both threshold crossing (e.g. 90 -> 110) and additional gain while
         already full/overcharged (e.g. 100 -> 130 or overflow into cap).
         """
+        # Ignore pre-turn setup (on_create at round 0) so energy-full passives
+        # trigger from actual combat rounds and do not consume round-1 windows.
+        if self.round <= 0:
+            return
+
         if hero.energy < 100:
             return
 
